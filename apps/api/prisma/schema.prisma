@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Cliente {
+  id         String    @id @default(uuid())
+  nome       String
+  telefone   String
+  email      String?   @unique
+  temConta   Boolean   @default(false)
+  senhaHash  String?
+  pedidos    Pedido[]
+  enderecos  Endereco[]
+
+  @@map("clientes")
+}
+
+model Endereco {
+  id               String   @id @default(uuid())
+  clienteId        String
+  cliente          Cliente  @relation(fields: [clienteId], references: [id])
+  descricao        String
+  enderecoCompleto String
+  latitude         Float
+  longitude        Float
+  principal        Boolean  @default(false)
+  pedidos          Pedido[]
+
+  @@map("enderecos")
+}
+
+model Prato {
+  id          String       @id @default(uuid())
+  nome        String
+  descricao   String
+  preco       Decimal
+  fotoUrl     String?
+  disponivel  Boolean      @default(true)
+  itens       ItemPedido[]
+
+  @@map("pratos")
+}
+
+model Pedido {
+  id          String       @id @default(uuid())
+  clienteId   String
+  cliente     Cliente      @relation(fields: [clienteId], references: [id])
+  enderecoId  String
+  endereco    Endereco     @relation(fields: [enderecoId], references: [id])
+  status      String       @default("pendente")
+  total       Decimal
+  criadoEm   DateTime     @default(now())
+  itens       ItemPedido[]
+  pagamento   Pagamento?
+
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id            String  @id @default(uuid())
+  pedidoId      String
+  pedido        Pedido  @relation(fields: [pedidoId], references: [id])
+  pratoId       String
+  prato         Prato   @relation(fields: [pratoId], references: [id])
+  quantidade    Int
+  precoUnitario Decimal
+
+  @@map("itens_pedido")
+}
+
+model Pagamento {
+  id            String    @id @default(uuid())
+  pedidoId      String    @unique
+  pedido        Pedido    @relation(fields: [pedidoId], references: [id])
+  metodo        String
+  status        String    @default("pendente")
+  idTransacaoMp String?
+  pagoEm        DateTime?
+
+  @@map("pagamentos")
+}
+
+model ContatoWhatsapp {
+  id       String  @id @default(uuid())
+  nome     String
+  telefone String
+  ativo    Boolean @default(true)
+
+  @@map("contatos_whatsapp")
+}
