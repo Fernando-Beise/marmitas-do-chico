@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../db/client'
-import bcrypt from 'bcrypt' // Nota: Se der erro na instalação, use 'bcryptjs'
+import bcrypt from 'bcrypt'
 
 export async function authRoutes(app: FastifyInstance) {
   
-  // 1. ROTA DE LOGIN (Gera o Token JWT)
+  // ROTA DE LOGIN (Gera o Token JWT)
   app.post('/login', async (request, reply) => {
     try {
       const { email, senha } = request.body as any
@@ -51,7 +51,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   })
 
-  // 2. ROTA DE REGISTRO (Para você criar o usuário do Chico via Postman/Insomnia)
+  // ROTA DE REGISTRO (Para criar do Chico via Postman)
   app.post('/registrar', async (request, reply) => {
     try {
       const { nome, email, telefone, senha } = request.body as any
@@ -78,7 +78,7 @@ export async function authRoutes(app: FastifyInstance) {
           nome,
           email,
           telefone: telefone || "00000000000",
-          senhaHash // Salva apenas o Hash, nunca a senha em texto puro!
+          senhaHash // Salva apenas o Hash
         }
       })
 

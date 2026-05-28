@@ -10,22 +10,22 @@ export async function pedidosRoutes(app: FastifyInstance) {
 
       if (!idDoUsuario || idDoUsuario.includes("Ajustado")) {
   
-        // SE ESSA LINHA NÃO ESTIVER SALVA, O PRISMA VAI CONTINUAR QUEBRANDO
+        
         if (!body.dadosEntrega?.email) {
             return reply.status(400).send({ message: 'E-mail obrigatório no front-end.' })
         }
 
-        // Tenta achar o cliente pelo e-mail
-        let clienteExistente = await prisma.cliente.findUnique({
-            where: { email: body.dadosEntrega.email }
+        // Tenta achar o cliente pelo numero
+        let clienteExistente = await prisma.cliente.findFirst({
+            where: { telefone: body.dadosEntrega.telefone }
         })
 
-        // Se não achar o cliente, cadastra ele no banco Neon automaticamente
+        // Se não achar o cliente, cadastra ele
         if (!clienteExistente) {
             clienteExistente = await prisma.cliente.create({
             data: {
                 nome: `${body.dadosEntrega.nome || ''} ${body.dadosEntrega.sobrenome || ''}`.trim(),
-                telefone: body.dadosEntrega.telefone || "51999999999",
+                telefone: body.dadosEntrega.telefone,
                 email: body.dadosEntrega.email 
             }
             })
@@ -83,7 +83,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
       let dadosDoPix = { qrCodeCopyPaste: "", qrCodeBase64: "" }
       let transacaoIdMp = "MOCK_" + novoPedido.id
 
-      // 5. INTEGRAÇÃO COM ORDERS BASEADA NO SEU DUMP DE DOCUMENTAÇÃO
+      // INTEGRAÇÃO COM ORDERS
       if (MERCADO_PAGO_TOKEN) {
         const valorFormatadoString = String(Number(body.total).toFixed(2))
 
@@ -99,7 +99,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
               external_reference: novoPedido.id,
               total_amount: valorFormatadoString,
               payer: {
-                // Se o cliente digitar um e-mail real, o Sandbox exige o do TestUser, então deixamos essa trava inteligente:
+                // o Sandbox exige o do TestUser, essa trava:
                 // Em produção seria apenas: email: body.dadosEntrega.email
                 email: body.dadosEntrega?.email?.includes('@testuser.com') 
                   ? body.dadosEntrega.email 
@@ -107,7 +107,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
                 
                 first_name: "APRO", // Gatilho obrigatório do Sandbox para aprovação automática
                 
-                // Adicionamos o sobrenome e o documento vindo direto do formulário da tela!
+                // Adicionamos o sobrenome e o documento vindo do formulário
                 last_name: body.dadosEntrega?.sobrenome || 'Testador',
                 identification: {
                   type: 'CPF',
@@ -137,11 +137,11 @@ export async function pedidosRoutes(app: FastifyInstance) {
             dadosDoPix.qrCodeCopyPaste = principalPayment.payment_method.qr_code
             dadosDoPix.qrCodeBase64 = principalPayment.payment_method.qr_code_base64 || ""
             transacaoIdMp = String(principalPayment.id || orderData.id)
-            console.log("🚀 SUCESSO! O Mercado Pago aprovou e gerou o PIX!");
+            console.log("SUCESSO! O Mercado Pago aprovou e gerou o PIX!");
           }
         } else {
-          // AGORA SIM: Se der erro, passamos o status EXATO (ex: 401) para a tela do Front-end
-          console.error("❌ ERRO DO MERCADO PAGO:", orderData)
+          // Se der erro, o status EXATO (ex: 401) para a tela do Front-end
+          console.error("ERRO DO MERCADO PAGO:", orderData)
           return reply.status(mpResponse.status).send({ 
             error: "Recusado pelo Mercado Pago", 
             details: orderData 
@@ -164,7 +164,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
       })
 
     } catch (error) {
-      console.error("❌ Erro no Back-end:", error)
+      console.error("Erro no Back-end:", error)
       return reply.status(500).send({ error: "Erro interno no servidor." })
     }
   })

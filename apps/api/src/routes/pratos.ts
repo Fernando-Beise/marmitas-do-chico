@@ -4,21 +4,24 @@ import { Prisma } from '@prisma/client'
 
 export async function pratosRoutes(app: FastifyInstance) {
   
-  // 1. LISTAR TODOS OS PRATOS (Aberto para o cliente ver na Home)
+  //LISTAR TODOS OS PRATOS (Abertoe)
   app.get('/', async (request, reply) => {
+    // Pega o aviso do Front-end
+    const { admin } = request.query as any
+
     try {
       const pratos = await prisma.prato.findMany({
-        where: { disponivel: true }, // Traz apenas pratos ativos para o cliente não comprar o que não tem
-        orderBy: { nome: 'asc' }
+        // Se for admin, não usa filtro (undefined). Se não for, filtra apenas os disponíveis.
+        where: admin === 'true' ? undefined : { disponivel: true }
       })
+      
       return pratos
     } catch (error) {
-      app.log.error(error)
-      return reply.status(500).send({ message: 'Erro ao buscar o cardápio.' })
+      return reply.status(500).send({ error: 'Erro ao buscar pratos' })
     }
   })
 
-  // 2. CRIAR UM NOVO PRATO (Protegido - Só o Admin logado pode fazer)
+  // CRIAR UM NOVO PRATO (Protegido)
   app.post('/', async (request, reply) => {
     // Validação do Token JWT
     try {
@@ -27,7 +30,7 @@ export async function pratosRoutes(app: FastifyInstance) {
       return reply.status(401).send({ message: 'Token inválido ou ausente. Não autorizado.' })
     }
 
-    // Processamento da criação se o token for válido
+    // Processamento da criação
     try {
       const { nome, descricao, preco, fotoUrl } = request.body as any
 
@@ -39,7 +42,7 @@ export async function pratosRoutes(app: FastifyInstance) {
         data: {
           nome,
           descricao,
-          preco: new Prisma.Decimal(preco), // CORREÇÃO: Transforma para o tipo Decimal exigido pelo Prisma
+          preco: new Prisma.Decimal(preco),
           fotoUrl,
           disponivel: true
         }
@@ -52,7 +55,7 @@ export async function pratosRoutes(app: FastifyInstance) {
     }
   })
 
-  // 3. ATUALIZAR UM PRATO / ALTERAR DISPONIBILIDADE (Protegido)
+  // ATUALIZAR UM PRATO / ALTERAR DISPONIBILIDADE (Protegido)
   app.put('/:id', async (request, reply) => {
     // Validação do Token JWT
     try {
@@ -71,7 +74,7 @@ export async function pratosRoutes(app: FastifyInstance) {
         data: { 
           nome, 
           descricao, 
-          preco: preco ? new Prisma.Decimal(preco) : undefined, // CORREÇÃO: Trata o Decimal opcional se for enviado
+          preco: preco ? new Prisma.Decimal(preco) : undefined,
           fotoUrl, 
           disponivel 
         }
@@ -84,7 +87,7 @@ export async function pratosRoutes(app: FastifyInstance) {
     }
   })
 
-  // 4. DELETAR UM PRATO (Protegido)
+  // DELETAR UM PRATO (Protegido)
   app.delete('/:id', async (request, reply) => {
     // Validação do Token JWT
     try {

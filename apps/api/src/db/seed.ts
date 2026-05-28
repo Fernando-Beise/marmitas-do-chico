@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 async function main() {
   const senhaHash = await bcrypt.hash('chico123', 10)
 
-  // 1. Garante que o Chico existe
+  // Criando o Chico
   await prisma.cliente.upsert({
     where: { email: 'franciscobonfada@gmail.com' },
     update: {},
@@ -19,7 +19,7 @@ async function main() {
     }
   })
 
-  // 2. Injeta um prato de teste no cardápio
+  // Injeta um prato de teste no cardápio
   await prisma.prato.create({
     data: {
       nome: 'Strogonoff Caseiro do Chico',
@@ -30,7 +30,6 @@ async function main() {
     }
   })
 
-  console.log('🌱 Dados de teste (Admin + Prato) injetados com sucesso!')
 }
 
 main()

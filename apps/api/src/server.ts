@@ -1,8 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
-import path from 'path' // <-- ADICIONE ESSE IMPORT NATIVO
-import dotenv from 'dotenv' // <-- MUDE O IMPORT DO DOTENV PARA ESTE
+import path from 'path' 
+import dotenv from 'dotenv'
 import { authRoutes } from './routes/auth'
 import { pratosRoutes } from './routes/pratos'
 import { pedidosRoutes } from './routes/pedidos'
