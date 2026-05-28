@@ -6,12 +6,13 @@ export async function pratosRoutes(app: FastifyInstance) {
   
   //LISTAR TODOS OS PRATOS (Abertoe)
   app.get('/', async (request, reply) => {
-    // Pega o aviso do Front-end
-    const { admin } = request.query as any
+    // Captura o aviso da URL para saber se quem está pedindo é o painel de Admin
+    const { admin } = request.query as { admin?: string }
 
     try {
       const pratos = await prisma.prato.findMany({
-        // Se for admin, não usa filtro (undefined). Se não for, filtra apenas os disponíveis.
+        // Se a palavra admin for 'true', não aplica nenhum filtro (undefined = traz tudo).
+        // Se não for, filtra garantindo que só os pratos com 'disponivel: true' apareçam.
         where: admin === 'true' ? undefined : { disponivel: true }
       })
       
@@ -20,6 +21,7 @@ export async function pratosRoutes(app: FastifyInstance) {
       return reply.status(500).send({ error: 'Erro ao buscar pratos' })
     }
   })
+  
 
   // CRIAR UM NOVO PRATO (Protegido)
   app.post('/', async (request, reply) => {
