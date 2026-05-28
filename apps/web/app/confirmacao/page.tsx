@@ -47,9 +47,9 @@ export default function ConfirmacaoPage() {
   const [bairro, setBairro] = useState('')
   const [dadosEntrega, setDadosEntrega] = useState({
         nome: '',
-        sobrenome: '',     // <-- ADICIONADO
-        email: '',         // <-- ADICIONADO
-        cpf: '',           // <-- ADICIONADO
+        sobrenome: '',     
+        email: '',         
+        cpf: '',           
         telefone: '',
         rua: '',
         numero: '',
@@ -69,23 +69,22 @@ export default function ConfirmacaoPage() {
       // Mude este bloco dentro da sua handleFinalizarPedido:
         const itensPedido = cart.map((item) => ({
             pratoId: item.id,
-            quantidade: item.quantidade, // <-- Mudado de 'quantity' para 'quantidade' para casar com o Prisma
+            quantidade: item.quantidade, 
             precoUnitario: item.preco
         }))
 
-      // Faz a chamada para o nosso backend Fastify
-      // Faz a chamada para o nosso backend Fastify
+      // Faz a chamada para o backend criar o pedido e gerar o pagamento PIX
       const response = await api.post('/pedidos', {
         clienteId: "Ajustado pelo backend", 
         total: totalPrice,
         itens: itensPedido,
-        // CORREÇÃO: Enviando todos os dados juntos para o backend não quebrar!
+        // Enviando todos os dados juntos para o backend não quebrar!
         dadosEntrega: { 
           nome: nome,
           sobrenome: dadosEntrega.sobrenome,
           cpf: dadosEntrega.cpf,
           telefone: dadosEntrega.telefone,
-          email: dadosEntrega.email, // <-- Agora o e-mail vai viajar para a API!
+          email: dadosEntrega.email,
           rua: rua,
           numero: numero,
           bairro: bairro
@@ -104,7 +103,7 @@ export default function ConfirmacaoPage() {
     }
   }
 
-  // TELA 2: SUCESSO E QR CODE PIX
+  
   // Se o Mercado Pago devolveu o PIX, nós substituímos o formulário por esta tela
   if (pixDados) {
     return (
@@ -158,7 +157,7 @@ export default function ConfirmacaoPage() {
     )
   }
 
-  // TELA 1: FORMULÁRIO DE ENTREGA
+  // FORMULÁRIO DE ENTREGA
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />

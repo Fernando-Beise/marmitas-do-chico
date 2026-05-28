@@ -37,7 +37,7 @@ export default function CardapioAdminPage() {
 
   async function carregarPratos() {
     try {
-      const response = await api.get('/pratos')
+      const response = await api.get('/pratos?admin=true')
       setMeals(response.data)
     } catch (error) {
       console.error("Erro ao buscar pratos:", error)
@@ -124,93 +124,93 @@ export default function CardapioAdminPage() {
         </Button>
       </div>
 
-      {/* Grid de Pratos Atualizado e Visível 🚀 */}
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {meals.map((meal) => (
-    <Card 
-      key={meal.id} 
-      className={`border border-gray-200 bg-white shadow-sm rounded-xl overflow-hidden transition-all ${
-        !meal.disponivel ? "opacity-60 bg-gray-100 border-dashed border-gray-400" : ""
-      }`}
-    >
-      <CardContent className="p-4 space-y-4">
-        {/* Box da Imagem com borda visível */}
-        <div className="relative h-48 w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-          <img
-            src={meal.fotoUrl || 'https://placehold.co/400x300/f5e6d3/8b4513?text=Marmita'}
-            alt={meal.nome}
-            className="object-cover w-full h-full"
-          />
-        </div>
+      {/*grid de pratos*/}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {meals.map((meal) => (
+          <Card 
+            key={meal.id} 
+            className={`border border-gray-200 bg-white shadow-sm rounded-xl overflow-hidden transition-all ${
+              !meal.disponivel ? "opacity-60 bg-gray-100 border-dashed border-gray-400" : ""
+            }`}
+          >
+            <CardContent className="p-4 space-y-4">
+              {/* Box da Imagem */}
+              <div className="relative h-48 w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                <img
+                  src={meal.fotoUrl || 'https://placehold.co/400x300/f5e6d3/8b4513?text=Marmita'}
+                  alt={meal.nome}
+                  className="object-cover w-full h-full"
+                />
+              </div>
 
-        {/* Informações com Texto Escuro Garantido */}
-        <div className="space-y-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-bold text-lg text-gray-900 line-clamp-1">
-              {meal.nome}
-            </h3>
-            <span className="font-extrabold text-orange-600 shrink-0 text-base">
-              R$ {Number(meal.preco).toFixed(2)}
-            </span>
-          </div>
-          <p className="text-sm text-gray-600 line-clamp-2 h-10">
-            {meal.descricao || "Sem descrição informada."}
-          </p>
-        </div>
+              {/* Informações */}
+              <div className="space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-lg text-gray-900 line-clamp-1">
+                    {meal.nome}
+                  </h3>
+                  <span className="font-extrabold text-orange-600 shrink-0 text-base">
+                    R$ {Number(meal.preco).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 line-clamp-2 h-10">
+                  {meal.descricao || "Sem descrição informada."}
+                </p>
+              </div>
 
-        {/* Controles de Ação com Cores Sólidas e Visíveis */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-2">
-          {/* Switch de Ativo / Inativo */}
-          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-            <Switch
-              checked={meal.disponivel}
-              onCheckedChange={() => handleToggleAvailability(meal.id, meal.disponivel)}
-              className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
-            />
-            <span className={`text-xs font-bold ${meal.disponivel ? "text-green-700" : "text-gray-500"}`}>
-              {meal.disponivel ? "Ativo" : "Pausado"}
-            </span>
-          </div>
+              {/* Controles de Ação */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-2">
+                {/* Switch de Ativo / Inativo */}
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                  <Switch
+                    checked={meal.disponivel}
+                    onCheckedChange={() => handleToggleAvailability(meal.id, meal.disponivel)}
+                    className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+                  />
+                  <span className={`text-xs font-bold ${meal.disponivel ? "text-green-700" : "text-gray-500"}`}>
+                    {meal.disponivel ? "Ativo" : "Pausado"}
+                  </span>
+                </div>
 
-          {/* Botões com Contraste Total */}
-          <div className="flex gap-2">
-            {/* Botão Editar - Cinza Escuro com Texto Branco */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="border-gray-300 text-gray-700 bg-white hover:bg-gray-100 font-medium shadow-sm transition-colors"
-              onClick={() => {
-                setEditingMeal(meal)
-                setFormData({
-                  nome: meal.nome,
-                  descricao: meal.descricao || '',
-                  preco: meal.preco.toString(),
-                  fotoUrl: meal.fotoUrl || '',
-                  disponivel: meal.disponivel,
-                })
-                setIsModalOpen(true)
-              }}
-            >
-              <Pencil className="h-4 w-4 mr-1 text-gray-600" />
-              Editar
-            </Button>
-            
-            {/* Botão Excluir - Vermelho Sólido com Ícone Branco */}
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm transition-colors flex items-center gap-1"
-              onClick={() => handleDelete(meal.id)}
-            >
-              <Trash2 className="h-4 w-4 text-white" />
-              Excluir
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ))}
-</div>
+                {/* Botões*/}
+                <div className="flex gap-2">
+                  {/* Botão Editar*/}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-gray-300 text-gray-700 bg-white hover:bg-gray-100 font-medium shadow-sm transition-colors"
+                    onClick={() => {
+                      setEditingMeal(meal)
+                      setFormData({
+                        nome: meal.nome,
+                        descricao: meal.descricao || '',
+                        preco: meal.preco.toString(),
+                        fotoUrl: meal.fotoUrl || '',
+                        disponivel: meal.disponivel,
+                      })
+                      setIsModalOpen(true)
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-1 text-gray-600" />
+                    Editar
+                  </Button>
+                  
+                  {/* Botão Excluir */}
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm transition-colors flex items-center gap-1"
+                    onClick={() => handleDelete(meal.id)}
+                  >
+                    <Trash2 className="h-4 w-4 text-white" />
+                    Excluir
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Modal Criar / Editar */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -260,7 +260,7 @@ export default function CardapioAdminPage() {
               Cancelar
             </Button>
             
-            {/* Botão de Salvar Laranja e Visível */}
+            {/* Botão de Salvar */}
             <Button 
               onClick={handleSave} 
               className="bg-orange-600 text-white hover:bg-orange-700 font-bold shadow-md px-6"

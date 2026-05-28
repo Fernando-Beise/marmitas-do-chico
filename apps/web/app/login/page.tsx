@@ -15,7 +15,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
+    console.log('Tentando logar com:', { email, senha }) // Log para debug
     try {
       // Chamada para o seu backend Fastify
       const response = await axios.post('http://localhost:3001/auth/login', {
@@ -25,8 +25,9 @@ export default function LoginPage() {
 
       // Salva o token no localStorage para ser usado nas outras chamadas
       localStorage.setItem('adminToken', response.data.token)
-      
-      // Redireciona para a página de CRUD que você já tem pronta
+      document.cookie = `token=${response.data.token}; path=/; max-age=86400`;
+      console.log('Login bem-sucedido, token recebido:', response.data.token) // Log para debug
+      // Redireciona para a página de home do admin
       router.push('/admin/cardapio')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao fazer login.')

@@ -6,14 +6,14 @@ import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/storefront/header'
-import { useCart } from '../../lib/cart-context' // Caminho relativo direto e seguro
+import { useCart } from '../../lib/cart-context'
 import { formatCurrency } from '@/components/storefront/meal-card'
 
 function CarrinhoContent() {
   // Puxa o array 'cart', as funções de alteração e o preço total calculados pelo LocalStorage
   const { cart, updateQuantity, removeItem, totalPrice } = useCart()
 
-  // Se o array de itens do LocalStorage estiver vazio, mostra a tela amigável
+  // Se o array de itens do LocalStorage estiver vazio
   if (!cart || cart.length === 0) {
     return (
       <div className="min-h-screen bg-background">

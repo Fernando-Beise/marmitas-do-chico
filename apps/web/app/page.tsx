@@ -24,7 +24,7 @@ export default function HomePage() {
       try {
         const response = await api.get('/pratos')
         
-        // Correção do Filtro: Valida se o prato existe e se é true de forma ultra segura
+        // Valida se o prato existe e se é true
         const ativos = Array.isArray(response.data) 
           ? response.data.filter((meal: Prato) => meal && meal.disponivel === true)
           : []

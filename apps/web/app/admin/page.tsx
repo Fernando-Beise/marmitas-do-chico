@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { api } from '@/lib/axios' // Instância do axios com interceptor de token
+import { api } from '@/lib/axios'
 
 export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<any[]>([])
@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
-        {/* Adicione os outros cards seguindo este padrão: */}
+        {/* Adiciona os outros cards seguindo este padrão: */}
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">

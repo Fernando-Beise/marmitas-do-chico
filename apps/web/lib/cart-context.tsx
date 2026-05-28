@@ -31,7 +31,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [mounted, setMounted] = useState(false)
 
-  // 1. Função que busca a verdade direto do navegador
+
   const sincronizarCarrinho = () => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('marmitas_chico_cart')
@@ -43,7 +43,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // 2. O Contexto central é quem escuta os eventos agora!
   useEffect(() => {
     sincronizarCarrinho()
     setMounted(true)
