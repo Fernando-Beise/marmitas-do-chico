@@ -15,18 +15,16 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    console.log('Tentando logar com:', { email, senha }) // Log para debug
     try {
-      // Chamada para o seu backend Fastify
+      // Chamada para o backend para autenticar e obter o token JWT
       const response = await axios.post('http://localhost:3001/auth/login', {
         email,
         senha
       })
 
-      // Salva o token no localStorage para ser usado nas outras chamadas
+      // Salva o token no localStorage e no cookie para o middleware para ser usado nas outras chamadas
       localStorage.setItem('adminToken', response.data.token)
       document.cookie = `token=${response.data.token}; path=/; max-age=86400`;
-      console.log('Login bem-sucedido, token recebido:', response.data.token) // Log para debug
       // Redireciona para a página de home do admin
       router.push('/admin/cardapio')
     } catch (err: any) {

@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { prisma } from '../db/client'
 import { Prisma } from '@prisma/client'
 
+
 export async function pedidosRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
     try {
@@ -9,30 +10,25 @@ export async function pedidosRoutes(app: FastifyInstance) {
       let idDoUsuario = body.clienteId
 
       if (!idDoUsuario || idDoUsuario.includes("Ajustado")) {
-  
         
-        if (!body.dadosEntrega?.email) {
-            return reply.status(400).send({ message: 'E-mail obrigatório no front-end.' })
-        }
-
-        // Tenta achar o cliente pelo numero
-        let clienteExistente = await prisma.cliente.findFirst({
-            where: { telefone: body.dadosEntrega.telefone }
+        // Usando findFirst para contornar o cache do VS Code
+        let clienteExistente = await prisma.cliente.findUnique({
+          where: { email: body.dadosEntrega.email }
         })
 
-        // Se não achar o cliente, cadastra ele
+        // Se não encontrar, cadastra um novo
         if (!clienteExistente) {
             clienteExistente = await prisma.cliente.create({
-            data: {
-                nome: `${body.dadosEntrega.nome || ''} ${body.dadosEntrega.sobrenome || ''}`.trim(),
-                telefone: body.dadosEntrega.telefone,
-                email: body.dadosEntrega.email 
-            }
+                data: {
+                    nome: `${body.dadosEntrega.nome || ''} ${body.dadosEntrega.sobrenome || ''}`.trim(),
+                    telefone: body.dadosEntrega.telefone,
+                    email: body.dadosEntrega.email // Mantém o e-mail, mas sem o risco do banco quebrar
+                }
             })
         }
         
         idDoUsuario = clienteExistente.id
-    }
+      }
 
       const enderecoCompleto = `${body.dadosEntrega.rua}, ${body.dadosEntrega.numero} - ${body.dadosEntrega.bairro}`
       const novoEndereco = await prisma.endereco.create({
@@ -68,7 +64,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
           clienteId: idDoUsuario,
           enderecoId: novoEndereco.id,
           total: new Prisma.Decimal(body.total),
-          status: 'PENDENTE',
+          status: 'pendente',
           itens: {
             create: body.itens.map((item: any) => ({
               pratoId: item.pratoId,
@@ -166,6 +162,54 @@ export async function pedidosRoutes(app: FastifyInstance) {
     } catch (error) {
       console.error("Erro no Back-end:", error)
       return reply.status(500).send({ error: "Erro interno no servidor." })
+    }
+  })
+  app.get('/', async (request, reply) => {
+    // Exemplo de como deve estar o Prisma no back-end
+    const pedidos = await prisma.pedido.findMany({
+      include: {
+        cliente: true,
+        endereco: true,
+        pagamento: true,
+        itens: {
+          include: {
+            prato: true
+          }
+        }
+      },
+      orderBy: {
+        criadoEm: 'desc'
+      }
+    })
+    return pedidos
+  })
+  app.get('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        endereco: true, 
+        pagamento: true, 
+        itens: { include: { prato: true } }
+      }
+    })
+    return pedido
+  })
+  app.patch('/:id/status', async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string }
+      const { status } = request.body as { status: string }
+      
+      const pedidoAtualizado = await prisma.pedido.update({
+        where: { id },
+        data: { status }
+      })
+      
+      return reply.send(pedidoAtualizado)
+    } catch (error) {
+      console.error("Erro ao atualizar o status:", error)
+      return reply.status(500).send({ message: "Erro interno ao atualizar status" })
     }
   })
 }

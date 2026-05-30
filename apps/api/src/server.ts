@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 import { authRoutes } from './routes/auth'
 import { pratosRoutes } from './routes/pratos'
 import { pedidosRoutes } from './routes/pedidos'
+import { contatosRoutes } from './routes/contatos'
 
 const app = Fastify({ logger: true })
 
@@ -13,7 +14,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
 app.register(cors, { 
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
 })
 app.register(jwt, { secret: process.env.JWT_SECRET! })
@@ -25,6 +26,7 @@ app.get('/health', async () => {
 app.register(authRoutes, { prefix: '/auth' }) 
 app.register(pratosRoutes, { prefix: '/pratos' })
 app.register(pedidosRoutes, { prefix: '/pedidos' })
+app.register(contatosRoutes, { prefix: '/contatos' })
 
 const start = async () => {
   try {

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { Plus, Pencil, Trash2, Upload } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Pencil, Trash2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -115,13 +116,24 @@ export default function CardapioAdminPage() {
         </div>
         
         {/* Botão com Cor Sólida Laranja (Garantido de aparecer) */}
-        <Button 
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botão do WhatsApp */}
+          <Link href="/admin/whatsapp">
+            <Button className="gap-2 bg-green-600 text-white hover:bg-green-700">
+              <Send className="h-4 w-4" />
+              Enviar para os contatos
+            </Button>
+          </Link>
+
+          {/* O seu botão de Adicionar Prato já existente fica aqui */}
+          <Button 
           onClick={openCreateModal} 
           className="bg-orange-600 text-white hover:bg-orange-700 font-bold shadow-md px-4 py-2 transition-colors flex items-center gap-2"
         >
           <Plus className="h-5 w-5" /> 
           Nova Marmita
         </Button>
+        </div>
       </div>
 
       {/*grid de pratos*/}

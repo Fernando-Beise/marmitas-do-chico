@@ -14,11 +14,14 @@ model Cliente {
   email      String?   @unique
   temConta   Boolean   @default(false)
   senhaHash  String?
+  criadoEm   DateTime @default(now())
   pedidos    Pedido[]
   enderecos  Endereco[]
+  recebeNotificacoes Boolean  @default(true)
 
   @@map("clientes")
 }
+
 
 model Endereco {
   id               String   @id @default(uuid())
@@ -83,13 +86,4 @@ model Pagamento {
   pagoEm        DateTime?
 
   @@map("pagamentos")
-}
-
-model ContatoWhatsapp {
-  id       String  @id @default(uuid())
-  nome     String
-  telefone String
-  ativo    Boolean @default(true)
-
-  @@map("contatos_whatsapp")
 }
