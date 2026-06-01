@@ -49,14 +49,25 @@ function CarrinhoContent() {
         </div>
 
         <div className="space-y-4">
-          {cart.map((item) => {
+          {cart.map((item: any) => {
             // Puxa a fotoUrl direta do item (salva de forma plana no LocalStorage)
             const imagemPrato = item.fotoUrl || 'https://placehold.co/600x450?text=Marmita+do+Chico'
             
+            // CÁLCULO DINÂMICO DOS ADICIONAIS (Nomes de variáveis atualizados)
+            const basePrice = Number(item.precoUnitario) || 0;
+            const extrasTotal = item.adicionaisEscolhidos?.reduce((acc: number, adic: any) => {
+              return acc + (Number(adic.precoCobrado) * Number(adic.quantidade));
+            }, 0) || 0;
+            
+            // Subtotal daquela linha = (Prato + Valor dos Adicionais) * Quantidade de Marmitas
+            const subtotalItem = (basePrice * item.quantidade) + extrasTotal;
+            
             return (
               <Card key={item.id} className="overflow-hidden">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                  
+                  {/* Foto da Marmita */}
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg self-start sm:self-center">
                     <Image
                       src={imagemPrato}
                       alt={item.nome}
@@ -66,15 +77,40 @@ function CarrinhoContent() {
                     />
                   </div>
                   
+                  {/* Informações da Marmita e Adicionais */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-card-foreground truncate">{item.nome}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-1">{item.descricao}</p>
                     <p className="text-sm font-medium text-primary mt-1">
-                      {formatCurrency(item.preco)}
+                      {formatCurrency(basePrice)}
                     </p>
+                    
+                    
+                    {/* LISTAGEM DOS ADICIONAIS */}
+                    {item.adicionaisEscolhidos && item.adicionaisEscolhidos.length > 0 && (
+                      <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                          Adicionais:
+                        </p>
+                        {item.adicionaisEscolhidos.map((adic: any, index: number) => (
+                          <div key={index} className="flex justify-between text-xs text-muted-foreground">
+                            <span>
+                              <span className="font-bold text-foreground/70 mr-1">{adic.quantidade}x</span> 
+                              {adic.nome}
+                            </span>
+                            <span>
+                              {adic.precoCobrado > 0 
+                                ? `+ ${formatCurrency(adic.precoCobrado * adic.quantidade)}` 
+                                : 'Grátis'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
+                  {/* Controles de Quantidade e Subtotal */}
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t border-border sm:border-0">
+                    
                     {/* Botões de + e - quantidade */}
                     <div className="flex items-center gap-2 border border-input rounded-lg p-1 bg-background">
                       <button
@@ -93,9 +129,9 @@ function CarrinhoContent() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                      {/* Subtotal do Item específico */}
-                      <span className="font-semibold text-foreground">
-                        {formatCurrency(item.preco * item.quantidade)}
+                      {/* Subtotal do Item específico COM OS ADICIONAIS EMBUTIDOS */}
+                      <span className="font-semibold text-foreground text-lg">
+                        {formatCurrency(subtotalItem)}
                       </span>
                       <Button
                         variant="ghost"
@@ -129,7 +165,7 @@ function CarrinhoContent() {
         <div className="mt-6">
           {/* Botão que leva para a página de dados de entrega e PIX */}
           <Link href="/confirmacao" className="block">
-            <Button className="w-full bg-primary py-6 text-lg text-primary-foreground hover:bg-primary/90 font-bold rounded-xl">
+            <Button className="w-full bg-primary py-6 text-lg text-primary-foreground hover:bg-primary/90 font-bold rounded-xl shadow-lg">
               Confirmar Pedido
             </Button>
           </Link>

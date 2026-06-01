@@ -4,7 +4,6 @@ import Image from 'next/image'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { useCart } from '../../lib/cart-context' // <-- Mudamos para caminho relativo para não ter erro de pasta!
 
 interface Prato {
   id: string
@@ -27,15 +26,10 @@ export function formatCurrency(value: number) {
 }
 
 export function MealCard({ meal }: MealCardProps) {
-  const cartContext = useCart()
-  
-  // Pegamos a função de forma ultra segura contra "is not a function"
-  const addItem = cartContext?.addItem
-
   const imagemPrato = meal.fotoUrl || 'https://placehold.co/600x450?text=Marmita+do+Chico'
 
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-lg">
+    <Card className="overflow-hidden transition-shadow hover:shadow-lg flex flex-col h-full">
       <div className="relative aspect-[4/3] overflow-hidden">
         <Image
           src={imagemPrato}
@@ -46,28 +40,23 @@ export function MealCard({ meal }: MealCardProps) {
           unoptimized
         />
       </div>
-      <CardContent className="p-4">
+      <CardContent className="p-4 flex flex-col flex-1">
         <h3 className="mb-1 font-semibold text-card-foreground">{meal.nome}</h3>
-        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
+        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground flex-1">
           {meal.descricao}
         </p>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-auto">
           <span className="text-lg font-bold text-primary">
             {formatCurrency(meal.preco)}
           </span>
+          {/* Botão apenas visual. O clique é gerenciado pela página Home para abrir o Modal! */}
           <Button
             size="sm"
-            onClick={() => {
-              if (typeof addItem === 'function') {
-                addItem(meal)
-              } else {
-                console.error('Contexto do carrinho não carregou corretamente no componente!', cartContext)
-              }
-            }}
-            className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
+            className="gap-1 bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-none"
+            type="button"
           >
             <Plus className="h-4 w-4" />
-            Adicionar
+            Personalizar
           </Button>
         </div>
       </CardContent>

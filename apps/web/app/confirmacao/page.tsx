@@ -8,6 +8,12 @@ import { Header } from '@/components/storefront/header'
 import { useCart } from '../../lib/cart-context'
 import { api } from '../../services/api'
 
+// Importações do Mercado Pago (Checkout Transparente)
+import { initMercadoPago, Payment } from '@mercadopago/sdk-react'
+
+// INICIALIZA O MERCADO PAGO (Coloque sua Public Key de teste ou produção aqui)
+initMercadoPago('APP_USR-d5a85935-afec-452c-99ae-9f9846e72430', { locale: 'pt-BR' });
+
 // Função utilitária para formatar o dinheiro
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -15,6 +21,7 @@ const formatCurrency = (value: number) => {
     currency: 'BRL',
   }).format(value)
 }
+
 const formatarCPF = (value: string) => {
   return value
     .replace(/\D/g, '') // Remove tudo o que não é dígito
@@ -35,11 +42,12 @@ const formatarTelefone = (value: string) => {
 export default function ConfirmacaoPage() {
   const { cart, totalPrice, clearCart } = useCart()
   const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1) // Controla se estamos no formulário (1) ou no pagamento (2)
   
-  // Estado para armazenar o retorno do Mercado Pago
-  const [pixDados, setPixDados] = useState<{ qrCodeCopyPaste: string; qrCodeBase64: string } | null>(null)
+  // Estado unificado para armazenar o retorno do Mercado Pago (PIX ou Cartão)
+  const [resultadoPagamento, setResultadoPagamento] = useState<any>(null)
 
-  // Estados dos campos do formulário
+  // Estados dos campos do formulário (Mantidos exatamente iguais)
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [rua, setRua] = useState('')
@@ -56,29 +64,32 @@ export default function ConfirmacaoPage() {
         bairro: ''
     })
 
-  const handleFinalizarPedido = async (e: React.FormEvent) => {
+  // Avança para a tela do Cartão de Crédito/PIX
+  const handleIrParaPagamento = (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (cart.length === 0) {
       alert('Seu carrinho está vazio!')
       return
     }
+    setStep(2)
+  }
 
+  // Acionado pelo botão interno do Mercado Pago
+  const handleFinalizarPedido = async (paymentFormData: any) => {
     setLoading(true)
     try {
-      // Mude este bloco dentro da sua handleFinalizarPedido:
-        const itensPedido = cart.map((item) => ({
-            pratoId: item.id,
-            quantidade: item.quantidade, 
-            precoUnitario: item.preco
-        }))
+      const itensPedido = cart.map((item: any) => ({
+          pratoId: item.pratoId || item.id,
+          quantidade: item.quantidade, 
+          precoUnitario: item.precoUnitario || item.preco,
+          adicionaisEscolhidos: item.adicionaisEscolhidos || []
+      }))
 
-      // Faz a chamada para o backend criar o pedido e gerar o pagamento PIX
       const response = await api.post('/pedidos', {
         clienteId: "Ajustado pelo backend", 
         total: totalPrice,
         itens: itensPedido,
-        // Enviando todos os dados juntos para o backend não quebrar!
+        // Exatamente a sua estrutura mantida intacta
         dadosEntrega: { 
           nome: nome,
           sobrenome: dadosEntrega.sobrenome,
@@ -88,63 +99,77 @@ export default function ConfirmacaoPage() {
           rua: rua,
           numero: numero,
           bairro: bairro
-        } 
+        },
+        // Envia o pacote de segurança gerado pelo Mercado Pago
+        paymentData: paymentFormData
       })
 
-      // Salva os dados do PIX e limpa a sacola de compras global
-      setPixDados(response.data.pix)
+      // Salva os dados (seja PIX ou Cartão) e limpa a sacola
+      setResultadoPagamento(response.data)
       clearCart()
       
     } catch (error) {
-      console.error('Erro ao processar pagamento PIX:', error)
-      alert('Erro ao processar o pedido. Verifique se o seu Backend e o Mercado Pago estão rodando corretamente.')
+      console.error('Erro ao processar pagamento:', error)
+      alert('Erro ao processar o pedido. Verifique os dados e tente novamente.')
     } finally {
       setLoading(false)
     }
   }
 
   
-  // Se o Mercado Pago devolveu o PIX, nós substituímos o formulário por esta tela
-  if (pixDados) {
+  // TELA DE SUCESSO
+  if (resultadoPagamento) {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Header />
         <main className="container mx-auto px-4 py-12 flex flex-col items-center justify-center">
           <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 text-center shadow-lg animate-in fade-in zoom-in-95 duration-500">
             <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Pedido Recebido!</h2>
-            <p className="text-muted-foreground text-sm mb-8">
-              Pague via PIX para que o Chico comece a preparar sua marmita.
-            </p>
+            
+            {resultadoPagamento.pix ? (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Pedido Recebido!</h2>
+                <p className="text-muted-foreground text-sm mb-8">
+                  Pague via PIX para que o Chico comece a preparar sua marmita.
+                </p>
 
-            <div className="bg-white p-4 rounded-xl inline-block mb-6 border border-zinc-200">
-              {pixDados.qrCodeBase64 ? (
-                <Image 
-                  src={`data:image/jpeg;base64,${pixDados.qrCodeBase64}`} 
-                  alt="QR Code PIX" 
-                  width={200}
-                  height={200}
-                  className="mx-auto"
-                />
-              ) : (
-                <div className="w-48 h-48 flex items-center justify-center text-zinc-400">
-                  <QrCode className="w-12 h-12" />
+                <div className="bg-white p-4 rounded-xl inline-block mb-6 border border-zinc-200">
+                  {resultadoPagamento.pix.qrCodeBase64 ? (
+                    <Image 
+                      src={`data:image/jpeg;base64,${resultadoPagamento.pix.qrCodeBase64}`} 
+                      alt="QR Code PIX" 
+                      width={200}
+                      height={200}
+                      className="mx-auto"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 flex items-center justify-center text-zinc-400">
+                      <QrCode className="w-12 h-12" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="mb-8">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(pixDados.qrCodeCopyPaste)
-                  alert('Código PIX copiado para a área de transferência!')
-                }}
-                className="w-full flex items-center justify-center gap-2 border border-input hover:bg-muted text-foreground py-3 px-4 rounded-xl font-medium transition-colors"
-              >
-                <Copy className="h-5 w-5" />
-                Copiar Código PIX
-              </button>
-            </div>
+                <div className="mb-8">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(resultadoPagamento.pix.qrCodeCopyPaste)
+                      alert('Código PIX copiado para a área de transferência!')
+                    }}
+                    className="w-full flex items-center justify-center gap-2 border border-input hover:bg-muted text-foreground py-3 px-4 rounded-xl font-medium transition-colors"
+                  >
+                    <Copy className="h-5 w-5" />
+                    Copiar Código PIX
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Pagamento Aprovado!</h2>
+                <p className="text-muted-foreground text-sm mb-8">
+                  O seu pagamento foi aprovado com sucesso. O Chico já está preparando sua marmita!
+                </p>
+              </>
+            )}
 
             <Link href="/" className="block">
               <button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-4 rounded-xl text-lg transition-colors">
@@ -157,158 +182,205 @@ export default function ConfirmacaoPage() {
     )
   }
 
-  // FORMULÁRIO DE ENTREGA
+  // FLUXO DE CHECKOUT
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
 
       <main className="container mx-auto px-4 py-6 max-w-md">
-        <Link
-          href="/carrinho"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar ao carrinho
-        </Link>
+        
+        {/* Controle do Botão de Voltar baseado na etapa atual */}
+        {step === 1 ? (
+          <Link
+            href="/carrinho"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao carrinho
+          </Link>
+        ) : (
+          <button
+            onClick={() => setStep(1)}
+            className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 p-0 cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar aos dados de entrega
+          </button>
+        )}
 
-        <h1 className="mb-6 text-2xl font-bold">Dados de Entrega</h1>
+        <h1 className="mb-6 text-2xl font-bold">
+          {step === 1 ? "Dados de Entrega" : "Pagamento Seguro"}
+        </h1>
 
-        <form onSubmit={handleFinalizarPedido} className="space-y-6">
-            {/* Sessão: Contato */}
+        {/* ETAPA 1: O SEU FORMULÁRIO EXATO E INTACTO */}
+        {step === 1 && (
+          <form onSubmit={handleIrParaPagamento} className="space-y-6">
+              {/* Sessão: Contato */}
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                  <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider mb-2">
+                  Quem vai receber
+                  </h3>
+                  <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Nome Completo</label>
+                  <input 
+                      required 
+                      type="text" 
+                      value={nome} 
+                      onChange={e => setNome(e.target.value)} 
+                      className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
+                      placeholder="Ex: Fernando Silva" 
+                  />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium">Sobrenome</label>
+                      <input
+                          type="text"
+                          required
+                          className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+                          value={dadosEntrega.sobrenome}
+                          onChange={(e) => setDadosEntrega({ ...dadosEntrega, sobrenome: e.target.value })}
+                      />
+                  </div>
+
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">CPF (Obrigatório para o Pix e Cartão)</label>
+                      <input
+                          type="text"
+                          required
+                          placeholder="000.000.000-00"
+                          className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+                          value={dadosEntrega.cpf}
+                          onChange={(e) => setDadosEntrega({ 
+                          ...dadosEntrega, 
+                          cpf: formatarCPF(e.target.value) 
+                          })}
+                      />
+                  </div>
+
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Telefone / WhatsApp</label>
+                      <input
+                          type="text"
+                          required
+                          placeholder="(51) 99999-9999"
+                          className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+                          value={dadosEntrega.telefone}
+                          onChange={(e) => setDadosEntrega({ 
+                          ...dadosEntrega, 
+                          telefone: formatarTelefone(e.target.value) 
+                          })}
+                      />
+                  </div>
+
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">E-mail</label>
+                      <input
+                          type="email"
+                          required
+                          placeholder="seuemail@exemplo.com"
+                          className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+                          value={dadosEntrega.email}
+                          onChange={(e) => setDadosEntrega({ 
+                          ...dadosEntrega, 
+                          email: e.target.value.trim().toLowerCase() 
+                          })}
+                      />
+                  </div>
+              </div>
+
+            {/* Sessão: Endereço */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider mb-2">
-                Quem vai receber
-                </h3>
-                <div>
-                <label className="text-sm font-semibold mb-1.5 block">Nome Completo</label>
+              <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider mb-2">
+                Endereço
+              </h3>
+              <div>
+                <label className="text-sm font-semibold mb-1.5 block">Rua</label>
                 <input 
+                  required 
+                  type="text" 
+                  value={rua} 
+                  onChange={e => setRua(e.target.value)} 
+                  className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
+                  placeholder="Ex: Rua das Marmitas" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Número</label>
+                  <input 
                     required 
                     type="text" 
-                    value={nome} 
-                    onChange={e => setNome(e.target.value)} 
+                    value={numero} 
+                    onChange={e => setNumero(e.target.value)} 
                     className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
-                    placeholder="Ex: Fernando Silva" 
-                />
+                    placeholder="Ex: 123" 
+                  />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium">Sobrenome</label>
-                    <input
-                        type="text"
-                        required
-                        className="w-full border rounded p-2"
-                        value={dadosEntrega.sobrenome}
-                        onChange={(e) => setDadosEntrega({ ...dadosEntrega, sobrenome: e.target.value })}
-                    />
+                  <label className="text-sm font-semibold mb-1.5 block">Bairro</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={bairro} 
+                    onChange={e => setBairro(e.target.value)} 
+                    className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
+                    placeholder="Ex: Centro" 
+                  />
                 </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">CPF (Obrigatório para o Pix)</label>
-                    <input
-                        type="text"
-                        required
-                        placeholder="000.000.000-00"
-                        className="w-full border rounded p-2 focus:ring-2 focus:ring-primary focus:outline-none"
-                        value={dadosEntrega.cpf}
-                        onChange={(e) => setDadosEntrega({ 
-                        ...dadosEntrega, 
-                        cpf: formatarCPF(e.target.value) 
-                        })}
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Telefone / WhatsApp</label>
-                    <input
-                        type="text"
-                        required
-                        placeholder="(51) 99999-9999"
-                        className="w-full border rounded p-2 focus:ring-2 focus:ring-primary focus:outline-none"
-                        value={dadosEntrega.telefone}
-                        onChange={(e) => setDadosEntrega({ 
-                        ...dadosEntrega, 
-                        telefone: formatarTelefone(e.target.value) 
-                        })}
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">E-mail</label>
-                    <input
-                        type="email"
-                        required
-                        placeholder="seuemail@exemplo.com"
-                        className="w-full border rounded p-2 focus:ring-2 focus:ring-primary focus:outline-none"
-                        value={dadosEntrega.email}
-                        onChange={(e) => setDadosEntrega({ 
-                        ...dadosEntrega, 
-                        email: e.target.value.trim().toLowerCase() 
-                        })}
-                    />
-                </div>
-            </div>
-
-          {/* Sessão: Endereço */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider mb-2">
-              Endereço
-            </h3>
-            <div>
-              <label className="text-sm font-semibold mb-1.5 block">Rua</label>
-              <input 
-                required 
-                type="text" 
-                value={rua} 
-                onChange={e => setRua(e.target.value)} 
-                className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
-                placeholder="Ex: Rua das Marmitas" 
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-semibold mb-1.5 block">Número</label>
-                <input 
-                  required 
-                  type="text" 
-                  value={numero} 
-                  onChange={e => setNumero(e.target.value)} 
-                  className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
-                  placeholder="Ex: 123" 
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold mb-1.5 block">Bairro</label>
-                <input 
-                  required 
-                  type="text" 
-                  value={bairro} 
-                  onChange={e => setBairro(e.target.value)} 
-                  className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all" 
-                  placeholder="Ex: Centro" 
-                />
               </div>
             </div>
-          </div>
 
-          {/* Rodapé Fixo de Pagamento */}
-          <div className="pt-4">
-            <div className="mb-4 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
+            {/* Rodapé Fixo - Agora avança de tela em vez de já finalizar */}
+            <div className="pt-4">
+              <div className="mb-4 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
+                <span className="font-medium text-foreground">Total a pagar:</span>
+                <span className="text-2xl font-bold text-primary">{formatCurrency(totalPrice)}</span>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-4 rounded-xl text-lg transition-colors flex items-center justify-center"
+              >
+                Ir para o Pagamento
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ETAPA 2: BRICK DO MERCADO PAGO */}
+        {step === 2 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="mb-6 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
               <span className="font-medium text-foreground">Total a pagar:</span>
               <span className="text-2xl font-bold text-primary">{formatCurrency(totalPrice)}</span>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading} // Deixamos o botão habilitado para o clique, tratando validações direto no clique se necessário
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-4 rounded-xl text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-foreground border-t-transparent" />
-              ) : (
-                'Gerar QR Code PIX'
-              )}
-            </button>
+            <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+              <Payment
+                initialization={{ amount: totalPrice }}
+                customization={{
+                  paymentMethods: {
+                    creditCard: "all",
+                    debitCard: "all",
+                    bankTransfer: "all"
+                  },
+                }}
+                onSubmit={handleFinalizarPedido}
+                onError={(error) => {
+                  console.error("Erro no Brick:", error)
+                  alert("Erro ao carregar o módulo de pagamento do Mercado Pago.")
+                }}
+              />
+            </div>
+            
+            {loading && (
+              <div className="mt-4 text-center text-primary font-bold animate-pulse">
+                Processando pagamento, aguarde...
+              </div>
+            )}
           </div>
-        </form>
+        )}
+
       </main>
     </div>
   )

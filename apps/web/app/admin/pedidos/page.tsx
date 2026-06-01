@@ -25,7 +25,7 @@ import {
 
 import { api } from '@/services/api' 
 
-// Adicionei os campos extras que a etiqueta precisa (endereço, pagamento, etc)
+// Tipagem atualizada para receber os adicionais!
 type Pedido = {
   id: string
   total: number
@@ -46,13 +46,20 @@ type Pedido = {
     prato: {
       nome: string
     }
+    // Nova caixinha para os adicionais
+    adicionais?: {
+      quantidade: number
+      adicional?: {
+        nome: string
+      }
+    }[]
   }[]
   pagamento: {
     metodo: string
     status: string
     idTransacaoMp: string
     pagoEm: string  | null
-    } | null
+  } | null
 }
 
 export default function PedidosPage() {
@@ -223,8 +230,9 @@ export default function PedidosPage() {
                 <TableRow>
                   <TableHead>ID</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Itens</TableHead>
+                  <TableHead>Itens e Personalizações</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead>Pagto.</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -233,14 +241,15 @@ export default function PedidosPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center">
+                    {/* Aumentei o colSpan para 8 por causa da nova coluna Pagto. */}
+                    <TableCell colSpan={8} className="py-8 text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
                       <p className="text-muted-foreground mt-2">Carregando pedidos...</p>
                     </TableCell>
                   </TableRow>
                 ) : filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                       Nenhum pedido encontrado.
                     </TableCell>
                   </TableRow>
@@ -253,16 +262,43 @@ export default function PedidosPage() {
                       <TableCell className="font-semibold">
                         {order.cliente?.nome || 'Sem Nome'}
                       </TableCell>
-                      <TableCell className="max-w-[200px]">
-                        {order.itens?.map((i) => (
-                          <span key={i.prato.nome} className="inline-block bg-muted px-2 py-1 rounded-md mr-1 mb-1 font-medium">
-                            {i.quantidade}x {i.prato?.nome}
-                          </span>
+                      
+                      {/* === COLUNA DE ITENS E ADICIONAIS === */}
+                      <TableCell className="max-w-[250px]">
+                        {order.itens?.map((i, idx) => (
+                          <div key={idx} className="mb-2 last:mb-0">
+                            <span className="inline-block bg-muted px-2 py-1 rounded-md font-medium text-sm">
+                              {i.quantidade}x {i.prato?.nome}
+                            </span>
+                            
+                            {/* Renderiza os adicionais se existirem */}
+                            {i.adicionais && i.adicionais.length > 0 && (
+                              <div className="pl-2 mt-1 space-y-0.5">
+                                {i.adicionais.map((a, aIdx) => (
+                                  <p key={aIdx} className="text-xs text-muted-foreground">
+                                    + {a.quantidade}x {a.adicional?.nome || 'Adicional Excluído'}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </TableCell>
+
                       <TableCell className="font-semibold">
                         {formatCurrency(order.total)}
                       </TableCell>
+                      
+                      {/* === NOVA COLUNA DE PAGAMENTO === */}
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-xs uppercase">{order.pagamento?.metodo || 'N/A'}</span>
+                          <span className={`text-[10px] font-semibold uppercase ${order.pagamento?.status === 'aprovado' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {order.pagamento?.status || ''}
+                          </span>
+                        </div>
+                      </TableCell>
+
                       <TableCell>
                         <Badge variant="secondary" className={getStatusColor(order.status)}>
                           {getStatusLabel(order.status)}
@@ -295,14 +331,12 @@ export default function PedidosPage() {
       </div>
 
       {/* === ÁREA DE IMPRESSÃO (ESCONDIDA NA TELA, VISÍVEL NA FOLHA) === */}
-      {/* Cria uma grade com 2 colunas para caber perfeitamente na folha A4 */}
       <div className="hidden print:grid print:grid-cols-2 print:gap-4 print:w-full">
         {filteredOrders.map((order) => {
           const taxa = Number(order.taxaEntrega) || 0;
           const subtotal = Number(order.total) - taxa;
           
           return (
-            // break-inside-avoid impede que a etiqueta seja cortada no meio na virada da página
             <div key={order.id} className="border-2 border-black p-4 break-inside-avoid text-sm flex flex-col h-full bg-white text-black">
               
               {/* Cabeçalho da Etiqueta */}
@@ -329,13 +363,24 @@ export default function PedidosPage() {
                 </div>
               </div>
 
-              {/* Pratos (O mais importante ganha destaque) */}
+              {/* Pratos e Adicionais (Impressão) */}
               <div className="flex-grow">
                 <p className="font-bold mb-1 border-b border-gray-200">PEDIDO:</p>
-                <ul className="space-y-1 mb-2">
-                  {order.itens?.map((i) => (
-                    <li key={i.prato.nome} className="font-bold text-base leading-tight flex justify-between">
-                      <span>{i.quantidade}x {i.prato.nome}</span>
+                <ul className="space-y-2 mb-2">
+                  {order.itens?.map((i, idx) => (
+                    <li key={idx} className="flex flex-col">
+                      <div className="font-bold text-base leading-tight flex justify-between">
+                        <span>{i.quantidade}x {i.prato.nome}</span>
+                      </div>
+                      
+                      {/* Lista de adicionais na etiqueta */}
+                      {i.adicionais && i.adicionais.length > 0 && (
+                        <div className="pl-3 mt-0.5 text-xs font-semibold text-gray-700">
+                          {i.adicionais.map((a, aIdx) => (
+                            <div key={aIdx}>+ {a.quantidade}x {a.adicional?.nome || 'Adicional Excluído'}</div>
+                          ))}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -370,14 +415,12 @@ export default function PedidosPage() {
         })}
       </div>
 
-      {/* Estilo embutido para limpar a folha A4 e arrumar a grade */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           @page {
             size: A4 portrait;
             margin: 10mm;
           }
-          /* Esconde a barra lateral, topo e afins */
           aside, nav, header { display: none !important; }
           body, html, main { 
             width: 100% !important; 
@@ -385,7 +428,6 @@ export default function PedidosPage() {
             padding: 0 !important; 
             background: white !important; 
           }
-          /* Força as cores de bordas e fundos cinzas a aparecerem na impressora */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;

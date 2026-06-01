@@ -15,10 +15,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-// Importe sua API configurada
 import { api } from '@/services/api' 
 
-// Tipagem baseada no seu Prisma
+// 1. Tipagem atualizada com a caixinha de adicionais
 type PedidoDetalhe = {
   id: string
   status: string
@@ -46,6 +45,13 @@ type PedidoDetalhe = {
     prato: {
       nome: string
     }
+    adicionais?: {
+      quantidade: number
+      precoCobrado: number
+      adicional?: {
+        nome: string
+      }
+    }[]
   }[]
   pagamento: {
     id: string
@@ -66,7 +72,6 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState<string>('')
 
-  // Busca o pedido específico na API
   useEffect(() => {
     const fetchPedido = async () => {
       try {
@@ -85,12 +90,10 @@ export default function OrderDetailPage() {
     }
   }, [orderId])
 
-  // Função para salvar o novo status no banco de dados
   const handleUpdateStatus = async () => {
     try {
       setIsUpdating(true)
       await api.patch(`/pedidos/${orderId}/status`, { status: selectedStatus })
-      // Atualiza o estado local para refletir a mudança
       setOrder((prev) => prev ? { ...prev, status: selectedStatus } : prev)
       alert('Status atualizado com sucesso!')
     } catch (error) {
@@ -101,7 +104,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // Funções de formatação
   const formatCurrency = (value: number | string) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -161,7 +163,6 @@ export default function OrderDetailPage() {
     )
   }
 
-  // Calcula o subtotal dos itens (Total - Taxa de Entrega)
   const taxaEntrega = Number(order.taxaEntrega) || 0
   const totalPedido = Number(order.total) || 0
   const subtotal = totalPedido - taxaEntrega
@@ -256,17 +257,43 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.itens.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-sm font-medium">
-                        {item.quantidade}x
+                {order.itens.map((item) => {
+                  // Cálculo do subtotal da linha: (Preço da Marmita * Qtd) + (Preço Adicionais * Qtd Adicionais)
+                  const baseTotal = Number(item.precoUnitario) * item.quantidade;
+                  const addonsTotal = item.adicionais?.reduce((acc, adic) => acc + (Number(adic.precoCobrado) * adic.quantidade), 0) || 0;
+                  const linhaTotal = baseTotal + addonsTotal;
+
+                  return (
+                    <div key={item.id} className="flex flex-col py-3 border-b last:border-0 last:pb-0">
+                      
+                      {/* Linha Principal (Marmita) */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-sm font-medium">
+                            {item.quantidade}x
+                          </div>
+                          <span className="font-medium">{item.prato.nome}</span>
+                        </div>
+                        <span className="font-semibold">{formatCurrency(linhaTotal)}</span>
                       </div>
-                      <span className="font-medium">{item.prato.nome}</span>
+
+                      {/* Linhas de Adicionais */}
+                      {item.adicionais && item.adicionais.length > 0 && (
+                        <div className="pl-12 mt-2 space-y-1">
+                          {item.adicionais.map((adic, idx) => {
+                            const precoAdicionalTotal = Number(adic.precoCobrado) * adic.quantidade;
+                            return (
+                              <div key={idx} className="flex justify-between text-sm text-muted-foreground">
+                                <span>+ {adic.quantidade}x {adic.adicional?.nome || 'Adicional Excluído'}</span>
+                                <span>{precoAdicionalTotal > 0 ? formatCurrency(precoAdicionalTotal) : 'Grátis'}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <span>{formatCurrency(Number(item.precoUnitario) * item.quantidade)}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -296,11 +323,11 @@ export default function OrderDetailPage() {
               <div className="pt-4 border-t space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Método de Pagamento</span>
-                  <span className="font-medium uppercase">{order.pagamento.metodo}</span>
+                  <span className="font-medium uppercase">{order.pagamento?.metodo || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status do Pagamento</span>
-                  <span className="font-medium uppercase">{order.pagamento.status}</span>
+                  <span className="font-medium uppercase">{order.pagamento?.status || 'N/A'}</span>
                 </div>
               </div>
             </CardContent>

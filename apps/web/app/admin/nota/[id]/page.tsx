@@ -5,10 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { Printer, ArrowLeft, UtensilsCrossed, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-// Importe sua API
 import { api } from '@/services/api'
 
-// Tipagem baseada no seu Prisma
+// Tipagem baseada no seu Prisma + Adicionais
 type PedidoNota = {
   id: string
   status: string
@@ -33,6 +32,13 @@ type PedidoNota = {
     prato: {
       nome: string
     }
+    adicionais?: {
+      quantidade: number
+      precoCobrado: number
+      adicional?: {
+        nome: string
+      }
+    }[]
   }[]
   pagamento: {
     id: string
@@ -51,7 +57,6 @@ export default function DeliveryNotePage() {
   const [order, setOrder] = useState<PedidoNota | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Busca os dados do pedido no backend
   useEffect(() => {
     const fetchPedido = async () => {
       try {
@@ -90,7 +95,6 @@ export default function DeliveryNotePage() {
     })
   }
 
-  // Telas de carregamento e erro
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted">
@@ -111,13 +115,11 @@ export default function DeliveryNotePage() {
     )
   }
 
-  // Cálculos
   const taxaEntrega = Number(order.taxaEntrega) || 0
   const subtotal = Number(order.total) - taxaEntrega
 
   return (
     <div className="min-h-screen bg-muted p-6">
-      {/* Botões de Ação - Escondidos na hora de imprimir (classe no-print) */}
       <div className="no-print mx-auto mb-6 flex max-w-2xl items-center justify-between">
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -125,100 +127,97 @@ export default function DeliveryNotePage() {
         </Button>
         <Button onClick={handlePrint}>
           <Printer className="mr-2 h-4 w-4" />
-          Imprimir Nota
+          Imprimir Cupom
         </Button>
       </div>
 
-      {/* Papel da Nota Fiscal */}
       <div id="printable-receipt" className="mx-auto max-w-2xl bg-white p-8 text-black shadow-lg print:m-0 print:max-w-full print:shadow-none">
         
         {/* Cabeçalho */}
-        <div className="mb-8 border-b border-border pb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="mb-4 border-b border-gray-300 pb-4 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UtensilsCrossed className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold uppercase tracking-wider text-foreground">
+          <h1 className="text-xl font-bold uppercase tracking-wider text-black">
             Marmitas do Chico
           </h1>
-          <p className="text-muted-foreground">Pedido #{order.id.substring(0, 8).toUpperCase()}</p>
-          <p className="text-sm text-muted-foreground">{formatDate(order.criadoEm)}</p>
+          <p className="text-sm font-semibold">Pedido #{order.id.substring(0, 8).toUpperCase()}</p>
+          <p className="text-xs text-gray-600">{formatDate(order.criadoEm)}</p>
         </div>
 
         {/* Informações do Cliente */}
-        <div className="mb-8 grid gap-6 md:grid-cols-2">
-          <div>
-            <h2 className="mb-2 font-semibold text-foreground">Cliente:</h2>
-            <p className="text-muted-foreground">{order.cliente?.nome || 'Sem Nome'}</p>
-            <p className="text-muted-foreground">{order.cliente?.telefone}</p>
-          </div>
-          <div className="md:text-right">
-            <h2 className="mb-2 font-semibold text-foreground">Entrega:</h2>
-            <p className="capitalize text-muted-foreground">{order.metodoEntrega}</p>
-            {order.endereco ? (
-              <p className="text-muted-foreground">
-                {order.endereco.enderecoCompleto}
-                {order.endereco.complemento && ` (${order.endereco.complemento})`}
-              </p>
-            ) : (
-              <p className="text-muted-foreground">Retirada no local</p>
-            )}
-          </div>
+        <div className="mb-4 border-b border-gray-300 pb-4">
+          <h2 className="mb-1 font-bold text-black uppercase text-sm">Cliente:</h2>
+          <p className="text-sm font-medium">{order.cliente?.nome || 'Sem Nome'} - {order.cliente?.telefone}</p>
+          
+          <h2 className="mt-3 mb-1 font-bold text-black uppercase text-sm">Entrega:</h2>
+          <p className="text-sm font-medium capitalize">{order.metodoEntrega}</p>
+          {order.endereco ? (
+            <p className="text-sm">
+              {order.endereco.enderecoCompleto}
+              {order.endereco.complemento && ` (${order.endereco.complemento})`}
+            </p>
+          ) : (
+            <p className="text-sm">Retirada no local</p>
+          )}
         </div>
 
         {/* Tabela de Itens */}
-        <div className="mb-8">
+        <div className="mb-4 border-b border-gray-300 pb-4">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left">
-                <th className="py-2 font-semibold text-foreground">Item</th>
-                <th className="py-2 text-center font-semibold text-foreground">Qtd</th>
-                <th className="py-2 text-right font-semibold text-foreground">Preço</th>
-                <th className="py-2 text-right font-semibold text-foreground">Total</th>
+              <tr className="border-b border-gray-300 text-left">
+                <th className="py-2 font-bold text-black w-10">Qtd</th>
+                <th className="py-2 font-bold text-black">Item</th>
+                <th className="py-2 font-bold text-black text-right">Total</th>
               </tr>
             </thead>
             <tbody>
-              {order.itens.map((item) => (
-                <tr key={item.id} className="border-b border-border">
-                  <td className="py-3 text-foreground">{item.prato.nome}</td>
-                  <td className="py-3 text-center text-foreground">
-                    {item.quantidade}
-                  </td>
-                  <td className="py-3 text-right text-muted-foreground">
-                    {formatCurrency(item.precoUnitario)}
-                  </td>
-                  <td className="py-3 text-right font-medium text-foreground">
-                    {formatCurrency(Number(item.precoUnitario) * item.quantidade)}
-                  </td>
-                </tr>
-              ))}
+              {order.itens.map((item) => {
+                const baseTotal = Number(item.precoUnitario) * item.quantidade;
+                const addonsTotal = item.adicionais?.reduce((acc, adic) => acc + (Number(adic.precoCobrado) * adic.quantidade), 0) || 0;
+                const linhaTotal = baseTotal + addonsTotal;
+
+                return (
+                  <tr key={item.id} className="border-b border-gray-200 border-dashed align-top">
+                    {/* Linha da quantidade */}
+                    <td className="py-3 font-bold text-black">{item.quantidade}x</td>
+                    
+                    {/* Coluna do Prato + Adicionais (Na mesma célula para não quebrar tabelas pequenas) */}
+                    <td className="py-3">
+                      <div className="font-bold text-black">{item.prato.nome}</div>
+                      
+                      {item.adicionais && item.adicionais.length > 0 && (
+                        <div className="mt-1 text-xs text-gray-700">
+                          {item.adicionais.map((adic, idx) => (
+                            <div key={idx}>└─ {adic.quantidade}x {adic.adicional?.nome || 'Adic. Excluído'}</div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Total daquela marmita inteira */}
+                    <td className="py-3 text-right font-medium">
+                      {formatCurrency(linhaTotal)}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
             <tfoot>
-              {/* Linha de Subtotal */}
               <tr>
-                <td colSpan={3} className="pt-4 text-right text-muted-foreground">
-                  Subtotal:
-                </td>
-                <td className="pt-4 text-right text-foreground">
-                  {formatCurrency(subtotal)}
-                </td>
+                <td colSpan={2} className="pt-3 text-right text-sm">Subtotal:</td>
+                <td className="pt-3 text-right text-sm">{formatCurrency(subtotal)}</td>
               </tr>
-              {/* Linha de Taxa de Entrega (só mostra se houver) */}
               {taxaEntrega > 0 && (
                 <tr>
-                  <td colSpan={3} className="py-2 text-right text-muted-foreground">
-                    Taxa de Entrega:
-                  </td>
-                  <td className="py-2 text-right text-foreground">
-                    {formatCurrency(taxaEntrega)}
-                  </td>
+                  <td colSpan={2} className="py-1 text-right text-sm">Taxa de Entrega:</td>
+                  <td className="py-1 text-right text-sm">{formatCurrency(taxaEntrega)}</td>
                 </tr>
               )}
-              {/* Linha de Total */}
               <tr>
-                <td colSpan={3} className="py-4 text-right font-semibold text-foreground">
-                  Total a Pagar:
-                </td>
-                <td className="py-4 text-right text-xl font-bold text-primary">
+                <td colSpan={2} className="py-3 text-right font-bold text-base text-black">Total a Pagar:</td>
+                <td className="py-3 text-right font-bold text-base text-black">
                   {formatCurrency(order.total)}
                 </td>
               </tr>
@@ -226,82 +225,66 @@ export default function DeliveryNotePage() {
           </table>
         </div>
 
-        {/* Informações de Pagamento (Crucial para o entregador) */}
-        <div className="mb-8 rounded-lg bg-muted/50 p-4">
-          <h3 className="font-semibold text-foreground mb-2">Detalhes do Pagamento:</h3>
-          <p className="text-sm uppercase text-muted-foreground">Método: <span className="font-bold text-foreground">{order.pagamento.metodo}</span></p>
-          <p className="text-sm uppercase text-muted-foreground">Status: <span className="font-bold text-foreground">{order.pagamento.status}</span></p>
+        {/* Informações de Pagamento */}
+        <div className="mb-6 rounded border border-black p-3 text-center">
+          <h3 className="font-bold text-black text-sm uppercase">Detalhes do Pagamento</h3>
+          <p className="text-sm font-semibold mt-1">
+            {order.pagamento?.metodo || 'N/A'} - {order.pagamento?.status.toUpperCase() || 'N/A'}
+          </p>
           
-          {/* Se a pessoa pediu troco, o motoboy precisa ver isso em destaque! */}
           {order.trocoPara && (
-            <p className="text-sm text-yellow-600 font-bold mt-1">
-              LEVAR TROCO PARA: {formatCurrency(order.trocoPara)}
+            <p className="text-sm font-bold mt-2 uppercase border-t border-dashed border-black pt-2">
+              Levar troco para: {formatCurrency(order.trocoPara)}
             </p>
           )}
         </div>
 
         {/* Rodapé */}
-        <div className="border-t border-border pt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Obrigado pela preferência! Bom apetite.
-          </p>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Desenvolvido por Fernando Beise Ferreira — Projeto Integrador UFSM
+        <div className="text-center text-xs">
+          <p className="font-semibold text-black">Obrigado pela preferência!</p>
+          <p className="mt-2 text-gray-500">
+            Dev: Fernando Beise Ferreira
           </p>
         </div>
       </div>
       
-      {/* Classe utilitária do Tailwind para sumir com os botões na hora de imprimir */}
-      {/* Estilos avançados para impressão */}
-      {/* Estilos avançados para impressão em formato de Cupom (80mm) */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
-          /* 1. Esconde a interface inteira do site */
-          body * {
-            visibility: hidden;
-          }
+          body * { visibility: hidden; }
+          #printable-receipt, #printable-receipt * { visibility: visible; }
+          @page { margin: 0; }
           
-          /* 2. Mostra apenas o recibo */
-          #printable-receipt, #printable-receipt * {
-            visibility: visible;
-          }
-
-          /* 3. Tira as margens que o navegador coloca por padrão na folha */
-          @page {
-            margin: 0;
-          }
-          
-          /* 4. Transforma o recibo num cupom de 80mm (padrão de maquininha/ifood) */
           #printable-receipt {
             position: absolute;
             left: 0;
             top: 0;
-            width: 80mm !important; /* Largura exata da bobina */
+            width: 80mm !important;
             max-width: 80mm !important;
-            padding: 5mm !important; /* Espaçamento interno menor */
+            padding: 3mm 4mm !important;
             margin: 0;
             box-shadow: none;
             color: black;
           }
 
-          /* 5. Reduz o tamanho das fontes para caber no papel pequeno */
-          #printable-receipt h1 { font-size: 16px !important; margin-bottom: 4px; }
-          #printable-receipt h2 { font-size: 14px !important; margin-bottom: 2px; }
+          /* Fontes adaptadas para o papel de maquininha */
+          #printable-receipt h1 { font-size: 16px !important; margin-bottom: 2px; }
+          #printable-receipt h2 { font-size: 13px !important; margin-bottom: 1px; }
           #printable-receipt p, 
           #printable-receipt td, 
           #printable-receipt th,
-          #printable-receipt span { 
+          #printable-receipt span,
+          #printable-receipt div { 
             font-size: 12px !important; 
           }
 
-          /* 6. Aperta mais as tabelas e margens para economizar papel */
-          #printable-receipt .mb-8 { margin-bottom: 15px !important; }
-          #printable-receipt .pb-6 { padding-bottom: 10px !important; }
-          #printable-receipt .pt-6 { padding-top: 10px !important; }
-          #printable-receipt td, #printable-receipt th { padding: 4px 2px !important; }
+          /* Aperto de CSS para não gastar bobina térmica à toa */
+          #printable-receipt .mb-4 { margin-bottom: 8px !important; }
+          #printable-receipt .pb-4 { padding-bottom: 6px !important; }
+          #printable-receipt .mb-6 { margin-bottom: 10px !important; }
+          #printable-receipt td, #printable-receipt th { padding: 4px 0 !important; }
           
-          /* Esconde o ícone grande do topo para poupar espaço/tinta */
-          #printable-receipt .w-12 { display: none; }
+          /* Esconde o ícone de talher para economizar espaço e tinta na impressora */
+          #printable-receipt .w-12 { display: none !important; }
         }
       `}} />
     </div>

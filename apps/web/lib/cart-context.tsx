@@ -2,22 +2,29 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 
-interface Prato {
-  id: string
+// 1. Atualizamos a tipagem para o formato que a Home envia
+interface AdicionalEscolhido {
+  adicionalId: string
   nome: string
-  descricao: string
-  preco: number
-  fotoUrl: string | null
-  disponivel: boolean
+  precoCobrado: number
+  quantidade: number
 }
 
-interface CartItem extends Prato {
-  quantidade: number
+interface CartItem {
+  id: string              // O UUID único daquela linha no carrinho
+  pratoId: string         // O ID real do banco
+  nome: string
+  descricao: string
+  precoUnitario: number   // Novo nome do preço
+  fotoUrl: string | null
+  quantidade: number      // Quantidade de marmitas
+  adicionaisEscolhidos: AdicionalEscolhido[]
+  preco?: number          // Mantemos opcional para não quebrar legados
 }
 
 interface CartContextType {
   cart: CartItem[]
-  addItem: (prato: any) => void
+  addItem: (item: any) => void
   removeItem: (id: string) => void
   updateQuantity: (id: string, quantidade: number) => void
   clearCart: () => void
@@ -30,7 +37,6 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [mounted, setMounted] = useState(false)
-
 
   const sincronizarCarrinho = () => {
     if (typeof window !== 'undefined') {
@@ -56,15 +62,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const addItem = (prato: any) => {
+  const addItem = (novoItem: any) => {
+    // 2. A MÁGICA ESTÁ AQUI: Aceitamos tudo o que vem da Home perfeitamente
     const itemNormalizado: CartItem = {
-      id: prato.id,
-      nome: prato.nome || prato.name,
-      descricao: prato.descricao || prato.description,
-      preco: Number(prato.preco || prato.price || 0),
-      fotoUrl: prato.fotoUrl || prato.image || null,
-      disponivel: prato.disponivel !== undefined ? prato.disponivel : true,
-      quantidade: 1
+      id: novoItem.id, // O UUID gerado na Home para não misturar marmitas
+      pratoId: novoItem.pratoId || novoItem.id,
+      nome: novoItem.nome || novoItem.name,
+      descricao: novoItem.descricao || novoItem.description,
+      precoUnitario: Number(novoItem.precoUnitario || novoItem.preco || novoItem.price || 0),
+      fotoUrl: novoItem.fotoUrl || novoItem.image || null,
+      quantidade: novoItem.quantidade || 1, // AGORA PEGA A QUANTIDADE DA HOME!
+      adicionaisEscolhidos: novoItem.adicionaisEscolhidos || [], // AGORA GUARDA OS ADICIONAIS!
+      preco: Number(novoItem.precoUnitario || novoItem.preco || 0)
     }
 
     const savedCart = localStorage.getItem('marmitas_chico_cart')
@@ -73,7 +82,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const existingIndex = currentCart.findIndex((item) => item.id === itemNormalizado.id)
 
     if (existingIndex > -1) {
-      currentCart[existingIndex].quantidade += 1
+      currentCart[existingIndex].quantidade += itemNormalizado.quantidade
     } else {
       currentCart.push(itemNormalizado)
     }
@@ -111,8 +120,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event('carrinho-atualizado'))
   }
 
+  // Apenas a contagem de marmitas
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantidade, 0)
-  const totalPriceCalculated = cart.reduce((sum, item) => sum + item.preco * item.quantidade, 0)
+  
+  // 3. CÁLCULO TOTAL CORRIGIDO: Soma o prato + os adicionais!
+  const totalPriceCalculated = cart.reduce((sum, item) => {
+    const basePrice = Number(item.precoUnitario || item.preco || 0);
+    const listaAdicionais = Array.isArray(item.adicionaisEscolhidos) ? item.adicionaisEscolhidos : [];
+    
+    const extrasTotal = listaAdicionais.reduce((acc, adic) => {
+        const precoAdic = Number(adic.precoCobrado) || 0;
+        const qtdAdic = Number(adic.quantidade) || 1;
+        return acc + (precoAdic * qtdAdic);
+    }, 0);
+
+    const valorTotalItem = (basePrice * item.quantidade) + extrasTotal;
+    return sum + valorTotalItem;
+  }, 0)
 
   return (
     <CartContext.Provider
