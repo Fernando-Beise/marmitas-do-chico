@@ -45,6 +45,7 @@ model Prato {
   fotoUrl     String?
   disponivel  Boolean      @default(true)
   itens       ItemPedido[]
+  adicionais  Adicional[]  @relation("PratoAdicionais")
 
   @@map("pratos")
 }
@@ -72,8 +73,21 @@ model ItemPedido {
   prato         Prato   @relation(fields: [pratoId], references: [id])
   quantidade    Int
   precoUnitario Decimal
+  adicionais ItemPedidoAdicional[]
 
   @@map("itens_pedido")
+}
+
+model ItemPedidoAdicional {
+  id           String   @id @default(uuid())
+  quantidade   Int      @default(1)
+  precoCobrado Float    // Salva o preço exato do momento da compra (imutável)
+
+  itemPedidoId String
+  itemPedido   ItemPedido @relation(fields: [itemPedidoId], references: [id], onDelete: Cascade)
+
+  adicionalId  String
+  adicional    Adicional  @relation(fields: [adicionalId], references: [id])
 }
 
 model Pagamento {
@@ -86,4 +100,19 @@ model Pagamento {
   pagoEm        DateTime?
 
   @@map("pagamentos")
+}
+
+model Adicional {
+  id          String   @id @default(uuid())
+  nome        String
+  preco       Float    @default(0) // Pode ser 0 (ex: "Feijão à parte") ou ter valor (ex: "Ovo +R$2")
+  disponivel  Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  arquivado   Boolean  @default(false)
+
+  // Relações mágicas do Prisma (Muitos-para-Muitos)
+  pratos      Prato[]      @relation("PratoAdicionais")
+  itensPedidoAdicional ItemPedidoAdicional[]
+
+  @@map("adicionais")
 }

@@ -13,7 +13,13 @@ export async function pratosRoutes(app: FastifyInstance) {
       const pratos = await prisma.prato.findMany({
         // Se a palavra admin for 'true', não aplica nenhum filtro (undefined = traz tudo).
         // Se não for, filtra garantindo que só os pratos com 'disponivel: true' apareçam.
-        where: admin === 'true' ? undefined : { disponivel: true }
+        where: admin === 'true' ? undefined : { disponivel: true },
+        include: {
+          adicionais: true
+        },
+        orderBy: {
+          nome: 'asc'
+        }
       })
       
       return pratos
@@ -34,7 +40,13 @@ export async function pratosRoutes(app: FastifyInstance) {
 
     // Processamento da criação
     try {
-      const { nome, descricao, preco, fotoUrl } = request.body as any
+      const { nome, descricao, preco, fotoUrl, adicionaisIds} = request.body as{
+        nome: string, 
+        descricao: string,
+        preco: number, 
+        fotoUrl?: string,
+        adicionaisIds?: string[] 
+      }
 
       if (!nome || !preco) {
         return reply.status(400).send({ message: 'Nome e preço são obrigatórios.' })
@@ -46,7 +58,11 @@ export async function pratosRoutes(app: FastifyInstance) {
           descricao,
           preco: new Prisma.Decimal(preco),
           fotoUrl,
-          disponivel: true
+          disponivel: true,
+          // Faz a magia de vincular os IDs selecionados
+          adicionais: {
+            connect: adicionaisIds?.map(id => ({ id })) || []
+          }
         }
       })
 
@@ -69,7 +85,14 @@ export async function pratosRoutes(app: FastifyInstance) {
     // Processamento da atualização
     try {
       const { id } = request.params as { id: string }
-      const { nome, descricao, preco, fotoUrl, disponivel } = request.body as any
+      const { nome, descricao, preco, fotoUrl, disponivel, adicionaisIds } = request.body as {
+      nome: string,
+      descricao?: string,
+      preco: number,
+      fotoUrl?: string,
+      disponivel: boolean,
+      adicionaisIds?: string[]
+    }
 
       const pratoAtualizado = await prisma.prato.update({
         where: { id },
@@ -78,9 +101,19 @@ export async function pratosRoutes(app: FastifyInstance) {
           descricao, 
           preco: preco ? new Prisma.Decimal(preco) : undefined,
           fotoUrl, 
-          disponivel 
+          disponivel,
+          // O comando 'set' substitui todas as ligações anteriores pelas novas
+          adicionais: {
+            set: adicionaisIds?.map((adicionaisId: string) => ({ id: adicionaisId })) || []
+          }
+          // Pede para o Prisma devolver o prato já com os adicionais incluídos e atualizados
+          
+        },
+        include: {
+          adicionais: true
         }
       })
+      console.log('Prato atualizado com sucesso:', pratoAtualizado)
 
       return pratoAtualizado
     } catch (error) {

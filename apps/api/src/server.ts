@@ -7,6 +7,7 @@ import { authRoutes } from './routes/auth'
 import { pratosRoutes } from './routes/pratos'
 import { pedidosRoutes } from './routes/pedidos'
 import { contatosRoutes } from './routes/contatos'
+import { adicionaisRoutes } from './routes/adicionais'
 
 const app = Fastify({ logger: true })
 
@@ -27,6 +28,7 @@ app.register(authRoutes, { prefix: '/auth' })
 app.register(pratosRoutes, { prefix: '/pratos' })
 app.register(pedidosRoutes, { prefix: '/pedidos' })
 app.register(contatosRoutes, { prefix: '/contatos' })
+app.register(adicionaisRoutes, { prefix: '/adicionais' })
 
 const start = async () => {
   try {
