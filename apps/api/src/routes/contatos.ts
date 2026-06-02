@@ -21,7 +21,6 @@ export async function contatosRoutes(app: FastifyInstance) {
       data: { 
         nome, 
         telefone, 
-        email: `whatsapp_${Date.now()}@marmitasdochico.com.br`,
         recebeNotificacoes: true 
       }
     })

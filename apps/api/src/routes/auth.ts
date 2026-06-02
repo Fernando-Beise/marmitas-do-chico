@@ -14,17 +14,17 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       // Buscar o usuário pelo e-mail
-      const user = await prisma.cliente.findUnique({
+      const user = await prisma.admin.findUnique({
         where: { email }
       })
 
       // Se não achar o usuário ou ele não tiver senha (comprador normal)
-      if (!user || !user.senhaHash) {
+      if (!user || !user.senha) {
         return reply.status(401).send({ message: 'E-mail ou senha inválidos.' })
       }
 
       // Verificar se a senha bate com a criptografia
-      const senhaValida = await bcrypt.compare(senha, user.senhaHash)
+      const senhaValida = await bcrypt.compare(senha, user.senha)
 
       if (!senhaValida) {
         return reply.status(401).send({ message: 'E-mail ou senha inválidos.' })
@@ -54,16 +54,14 @@ export async function authRoutes(app: FastifyInstance) {
   // ROTA DE REGISTRO (Para criar do Chico via Postman)
   app.post('/registrar', async (request, reply) => {
     try {
-      const { nome, email, telefone, senha } = request.body as any
+      const { nome, email, senha } = request.body as any
 
       if (!nome || !email || !senha) {
         return reply.status(400).send({ message: 'Nome, e-mail e senha são obrigatórios.' })
       }
 
       // Verifica se já existe
-      const userExists = await prisma.cliente.findUnique({
-        where: { email }
-      })
+      const userExists = await prisma.admin.findUnique({ where: { email } })
 
       if (userExists) {
         return reply.status(400).send({ message: 'E-mail já cadastrado.' })
@@ -73,12 +71,11 @@ export async function authRoutes(app: FastifyInstance) {
       const saltRounds = 10
       const senhaHash = await bcrypt.hash(senha, saltRounds)
 
-      const newUser = await prisma.cliente.create({
+      const newUser = await prisma.admin.create({
         data: {
           nome,
           email,
-          telefone: telefone || "00000000000",
-          senhaHash // Salva apenas o Hash
+          senha: senhaHash // Salva apenas o Hash
         }
       })
 

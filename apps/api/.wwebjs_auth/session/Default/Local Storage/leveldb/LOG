@@ -1,0 +1,13 @@
+2026/06/02-13:46:36.046 eac Reusing MANIFEST C:\Users\Nando Mala\marmitas-do-chico\apps\api\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/06/02-13:46:36.071 eac Recovering log #9
+2026/06/02-13:46:36.072 eac Level-0 table #12: started
+2026/06/02-13:46:36.268 eac Level-0 table #12: 16983 bytes OK
+2026/06/02-13:46:36.317 eac Delete type=0 #9
+2026/06/02-13:46:36.322 464c Compacting 4@0 + 0@1 files
+2026/06/02-13:46:36.379 464c Generated table #14@0: 85 keys, 10225 bytes
+2026/06/02-13:46:36.380 464c Compacted 4@0 + 0@1 files => 10225 bytes
+2026/06/02-13:46:36.383 464c compacted to: files[ 0 1 0 0 0 0 0 ]
+2026/06/02-13:46:36.390 464c Delete type=2 #3
+2026/06/02-13:46:36.391 464c Delete type=2 #7
+2026/06/02-13:46:36.391 464c Delete type=2 #10
+2026/06/02-13:46:36.391 464c Delete type=2 #12

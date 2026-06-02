@@ -1,0 +1,24 @@
+2026/06/02-13:46:37.519 12c Reusing MANIFEST C:\Users\Nando Mala\marmitas-do-chico\apps\api\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/02-13:46:37.521 12c Recovering log #339
+2026/06/02-13:46:37.592 12c Reusing old log C:\Users\Nando Mala\marmitas-do-chico\apps\api\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000339.log 
+2026/06/02-13:54:09.161 3308 Level-0 table #348: started
+2026/06/02-13:54:09.991 3308 Level-0 table #348: 1249909 bytes OK
+2026/06/02-13:54:10.014 3308 Delete type=0 #339
+2026/06/02-13:55:06.177 12c Compacting 1@1 + 7@2 files
+2026/06/02-13:55:06.470 12c Generated table #349@1: 63108 keys, 2281327 bytes
+2026/06/02-13:55:06.642 12c Generated table #350@1: 12099 keys, 2161933 bytes
+2026/06/02-13:55:06.703 12c Generated table #351@1: 2231 keys, 2152750 bytes
+2026/06/02-13:55:06.810 12c Generated table #352@1: 22143 keys, 2237675 bytes
+2026/06/02-13:55:06.891 12c Generated table #353@1: 22269 keys, 2180261 bytes
+2026/06/02-13:55:07.216 12c Generated table #354@1: 107399 keys, 2258526 bytes
+2026/06/02-13:55:07.278 12c Generated table #355@1: 33412 keys, 858193 bytes
+2026/06/02-13:55:07.278 12c Compacted 1@1 + 7@2 files => 14130665 bytes
+2026/06/02-13:55:07.279 12c compacted to: files[ 0 0 7 0 0 0 0 ]
+2026/06/02-13:55:07.280 12c Delete type=2 #337
+2026/06/02-13:55:07.280 12c Delete type=2 #338
+2026/06/02-13:55:07.280 12c Delete type=2 #341
+2026/06/02-13:55:07.330 12c Delete type=2 #342
+2026/06/02-13:55:07.332 12c Delete type=2 #343
+2026/06/02-13:55:07.332 12c Delete type=2 #344
+2026/06/02-13:55:07.377 12c Delete type=2 #345
+2026/06/02-13:55:07.377 12c Delete type=2 #348

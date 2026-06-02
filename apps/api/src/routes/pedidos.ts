@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../db/client'
 import { Prisma } from '@prisma/client'
+import { whatsappClient } from '../services/whatsapp'
 
 
 export async function pedidosRoutes(app: FastifyInstance) {
@@ -16,15 +17,14 @@ export async function pedidosRoutes(app: FastifyInstance) {
       // 1. LÓGICA DO CLIENTE (Blindada)
       if (!idDoUsuario || idDoUsuario.includes("Ajustado")) {
         let clienteExistente = await prisma.cliente.findUnique({
-          where: { email: body.dadosEntrega.email }
+          where: { telefone: body.dadosEntrega.telefone }
         })
 
         if (!clienteExistente) {
             clienteExistente = await prisma.cliente.create({
                 data: {
                     nome: `${body.dadosEntrega.nome || ''} ${body.dadosEntrega.sobrenome || ''}`.trim(),
-                    telefone: body.dadosEntrega.telefone,
-                    email: body.dadosEntrega.email 
+                    telefone: body.dadosEntrega.telefone
                 }
             })
         }
@@ -32,16 +32,18 @@ export async function pedidosRoutes(app: FastifyInstance) {
       }
       
 
-      // 2. LÓGICA DO ENDEREÇO
-      const enderecoCompleto = `${body.dadosEntrega.rua}, ${body.dadosEntrega.numero} - ${body.dadosEntrega.bairro}`
+      // 2. LÓGICA DO ENDEREÇO 
       const novoEndereco = await prisma.endereco.create({
         data: {
           clienteId: idDoUsuario,
-          descricao: 'Endereço de Entrega Padrão',
-          enderecoCompleto: enderecoCompleto,
-          latitude: 0.0,
-          longitude: 0.0,
-          principal: true
+          cep: body.dadosEntrega.cep,
+          rua: body.dadosEntrega.rua,
+          numero: body.dadosEntrega.numero,
+          bairro: body.dadosEntrega.bairro,
+          // Caso o front-end falhe, garantimos a cidade padrão
+          cidade: body.dadosEntrega.cidade || 'Santa Cruz do Sul', 
+          estado: body.dadosEntrega.estado || 'RS',
+          complemento: body.dadosEntrega.complemento || null
         }
       })
 
@@ -191,6 +193,33 @@ export async function pedidosRoutes(app: FastifyInstance) {
         }
       })
 
+      try {
+        // Verifica se o WhatsApp está conectado antes de tentar enviar
+        if (whatsappClient.info && body.dadosEntrega?.telefone) {
+          
+          // Remove parênteses, traços e espaços do telemóvel da base de dados
+          const telefoneLimpo = body.dadosEntrega.telefone.replace(/\D/g, '');
+          
+          // 2. Coloca o DDI do Brasil na frente, mas NÃO coloca o @c.us ainda
+          const numeroBrasil = `55${telefoneLimpo}`;
+
+          // 3. A MÁGICA: Pede ao WhatsApp para validar e descobrir o ID real (ele resolve o 9º dígito sozinho!)
+          const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+          if (idRegistrado) {
+            const mensagemConfirmacao = `Olá, *${body.dadosEntrega.nome}*! 👨‍🍳\n\nRecebemos o seu pedido!\n\nO Chico preparará sua marmita com muito carinho.\n\nAvisaremos por aqui quando começar a ser preparada e estiver a caminho. 🛵`;
+
+            // Disparamos a mensagem SEM usar o 'await' antes.
+            // Porquê? Para não fazer o site do cliente ficar a "pensar" à espera do WhatsApp.
+            whatsappClient.sendMessage(idRegistrado._serialized, mensagemConfirmacao)
+              .then(() => console.log(`[WHATSAPP] Confirmação de pedido enviada para ${body.dadosEntrega.nome}`))
+              .catch(err => console.error(`[WHATSAPP] Erro ao enviar confirmação para ${body.dadosEntrega.nome}:`, err));
+          }else{console.log(`[WHATSAPP] Número ${numeroBrasil} não registrado no WhatsApp. Não foi possível enviar a mensagem de confirmação.`)}
+        }
+      } catch (err) {
+        // Se der qualquer erro no WhatsApp, não quebra a compra do cliente
+        console.error("Erro no bloco de disparo do WhatsApp:", err);
+      }
+
       // Retorna para o Front-end saber o que mostrar na tela
       return reply.status(201).send({
         pedidoId: novoPedido.id,
@@ -257,13 +286,148 @@ export async function pedidosRoutes(app: FastifyInstance) {
       
       const pedidoAtualizado = await prisma.pedido.update({
         where: { id },
-        data: { status }
+        data: { status },
+        include: {
+          cliente: true}
       })
       
-      return reply.send(pedidoAtualizado)
+      // ========================================================
+        // 2. DISPARO AUTOMÁTICO DE WHATSAPP POR STATUS
+        // ========================================================
+        if (whatsappClient.info && pedidoAtualizado.cliente?.telefone) {
+            (async () => {
+                try {
+                    const telefoneLimpo = pedidoAtualizado.cliente.telefone.replace(/\D/g, '');
+                    const numeroBrasil = `55${telefoneLimpo}`;
+                    const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+
+                    if (idRegistrado) {
+                        const nome = pedidoAtualizado.cliente.nome;
+                        let mensagem = '';
+
+                        // 3. O "Switch" mágico que escolhe a mensagem certa com base no status
+                        switch (status) {
+                          case 'preparando':
+                              mensagem = `Opa, ${nome}! 👨‍🍳\n\nO Chico acabou de colocar o seu pedido na grelha! Estamos a preparar a sua marmita com muito capricho. Avisamos quando sair!`;
+                              break;
+                          
+                          case 'saiu_entrega':
+                              mensagem = `Boas notícias, ${nome}! 🛵💨\n\nO seu pedido acabou de sair para entrega! Fique atento(a) ao portão/campainha.`;
+                              break;
+                          
+                          case 'entregue':
+                              mensagem = `Pedido entregue! 🎉\n\nEsperamos que você tenha um excelente almoço, ${nome}! Muito obrigado por escolher o Marmitas do Chico. Até a próxima! 😋`;
+                              break;
+                          
+                          case 'cancelado':
+                              mensagem = `Olá, ${nome}. O seu pedido precisou ser cancelado. A nossa equipe ja entrará em contato para proceder com o reembolso.😔\n\nSe tiver dúvidas, responda esta mensagem para falar conosco.`;
+                              break;
+                        }
+
+                        // Só envia se o status for um dos mapeados acima
+                        if (mensagem !== '') {
+                            await whatsappClient.sendMessage(idRegistrado._serialized, mensagem);
+                            console.log(`[WHATSAPP] Status '${status}' enviado para ${nome}`);
+                        }else{
+                            console.log(`[WHATSAPP] Status '${status}' não tem mensagem mapeada. Nenhuma mensagem enviada para ${nome}.`);
+                        }
+                    }else{
+                        console.log(`[WHATSAPP] Número ${numeroBrasil} não registrado no WhatsApp. Não foi possível enviar a atualização de status '${status}'.`);
+                    }
+                } catch (err) {
+                    console.error(`[WHATSAPP] Erro ao notificar status para o pedido ${id}:`, err);
+                }
+            })(); // Roda em segundo plano para o admin não ficar esperando a tela carregar
+        }
+        // ========================================================
+
+        return reply.send(pedidoAtualizado);
+
     } catch (error) {
-      console.error("Erro ao atualizar o status:", error)
-      return reply.status(500).send({ message: "Erro interno ao atualizar status" })
+        console.error('Erro ao atualizar status:', error);
+        return reply.status(500).send({ error: 'Erro interno ao atualizar pedido' });
     }
   })
+  // ROTA PARA ATUALIZAR MÚLTIPLOS PEDIDOS DE UMA VEZ
+  app.patch('/bulk-status', async (request: any, reply) => {
+    try {
+        const { pedidoIds, novoStatus } = request.body;
+
+        // 1. Validação básica
+        if (!pedidoIds || !Array.isArray(pedidoIds) || pedidoIds.length === 0) {
+            return reply.status(400).send({ error: "Nenhum pedido selecionado para atualização." });
+        }
+        if (!novoStatus) {
+            return reply.status(400).send({ error: "O novo status é obrigatório." });
+        }
+
+        // 2. Atualiza todos os pedidos no Prisma num único comando rápido
+        const updateResult = await prisma.pedido.updateMany({
+            where: {
+                id: { in: pedidoIds }
+            },
+            data: {
+                status: novoStatus
+            }
+        });
+
+        // ========================================================
+        // 3. DISPARO DE WHATSAPP EM MASSA (COM DELAY DE SEGURANÇA)
+        // ========================================================
+        if (whatsappClient.info) {
+            (async () => {
+                try {
+                    // Como o updateMany não devolve os dados completos, precisamos buscar os clientes
+                    const pedidosAfetados = await prisma.pedido.findMany({
+                        where: { id: { in: pedidoIds } },
+                        include: { cliente: true }
+                    });
+
+                    for (const pedido of pedidosAfetados) {
+                        if (pedido.cliente?.telefone) {
+                            const telefoneLimpo = pedido.cliente.telefone.replace(/\D/g, '');
+                            const numeroBrasil = `55${telefoneLimpo}`;
+                            const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+
+                            if (idRegistrado) {
+                                const nome = pedido.cliente.nome;
+                                let mensagem = '';
+                                
+                                switch (novoStatus) {
+                                    case 'preparando':
+                                        mensagem = `Opa, ${nome}! 👨‍🍳\n\nO Chico acabou de colocar o seu pedido na grelha! Estamos a preparar a sua marmita com muito capricho.`;
+                                        break;
+                                    case 'saiu_entrega':
+                                        mensagem = `Boas notícias, ${nome}! 🛵💨\n\nO seu pedido acabou de sair para entrega! Fique atento(a) ao portão/campainha.`;
+                                        break;
+                                    case 'entregue':
+                                        mensagem = `Pedido entregue! 🎉\n\nEsperamos que você tenha um excelente almoço, ${nome}! Muito obrigado por escolher o Marmitas do Chico.`;
+                                        break;
+                                }
+
+                                if (mensagem !== '') {
+                                    await whatsappClient.sendMessage(idRegistrado._serialized, mensagem);
+                                    console.log(`[WHATSAPP BULK] Status '${novoStatus}' enviado para ${nome}`);
+                                    
+                                    // DELAY DE 3 SEGUNDOS: Super importante ao mover dezenas de pedidos juntos!
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('[WHATSAPP BULK] Erro no envio em massa:', err);
+                }
+            })(); // Roda em background
+        }
+        // ========================================================
+
+        // Responde ao Front-end imediatamente
+        return reply.send({ success: true, atualizados: updateResult.count });
+
+    } catch (error) {
+        console.error('Erro na atualização em massa:', error);
+        return reply.status(500).send({ error: 'Erro interno ao atualizar pedidos.' });
+    }
+  });
 }

@@ -10,10 +10,7 @@ datasource db {
 model Cliente {
   id         String    @id @default(uuid())
   nome       String
-  telefone   String
-  email      String?   @unique
-  temConta   Boolean   @default(false)
-  senhaHash  String?
+  telefone   String    @unique
   criadoEm   DateTime @default(now())
   pedidos    Pedido[]
   enderecos  Endereco[]
@@ -22,17 +19,31 @@ model Cliente {
   @@map("clientes")
 }
 
+model Admin {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String   // Guardará o hash da password
+  criadoEm  DateTime @default(now())
+
+  @@map("admin")
+}
 
 model Endereco {
-  id               String   @id @default(uuid())
-  clienteId        String
-  cliente          Cliente  @relation(fields: [clienteId], references: [id])
-  descricao        String
-  enderecoCompleto String
-  latitude         Float
-  longitude        Float
-  principal        Boolean  @default(false)
-  pedidos          Pedido[]
+  id          String   @id @default(uuid())
+  clienteId   String
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  
+  // Campos fragmentados e limpos
+  cep         String
+  rua         String
+  numero      String
+  bairro      String
+  cidade      String
+  estado      String
+  complemento String?  // Opcional, caso o cliente queira adicionar "Apto 201" no futuro
+  
+  pedidos     Pedido[]
 
   @@map("enderecos")
 }
