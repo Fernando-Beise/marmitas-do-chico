@@ -6,7 +6,18 @@ import qrcode from 'qrcode-terminal';
 export const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true, // Mantém como true para rodar em servidor
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // Importante para servidores com pouca RAM
+            '--disable-gpu'
+        ],
+        protocolTimeout: 60000 // Aumenta o tempo limite para 60 segundos
     }
 });
 
