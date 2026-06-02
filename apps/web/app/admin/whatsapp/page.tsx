@@ -28,8 +28,11 @@ export default function WhatsAppBroadcastPage() {
   
   const [isSending, setIsSending] = useState(false)
   const [isSent, setIsSent] = useState(false)
+  
+  // Guarda o resultado real do envio que vem do Back-end
+  const [sendResult, setSendResult] = useState<{ enviados: number; total: number } | null>(null)
 
-  // NOVO: Estado que guarda a mensagem editável
+  // Estado que guarda a mensagem editável
   const [messageText, setMessageText] = useState('')
 
   const formatCurrency = (value: number | string) => {
@@ -45,12 +48,14 @@ export default function WhatsAppBroadcastPage() {
       try {
         const [pratosRes, contatosRes] = await Promise.all([
           api.get('/pratos'),
-          api.get('/contatos')
+          api.get('/contatos') // Assumindo que tem uma rota que retorna os clientes
         ])
         
         const pratosRecebidos = pratosRes.data
         setPratos(pratosRecebidos)
-        setContatos(contatosRes.data)
+        
+        // Se a rota for /clientes e não /contatos, mude acima se necessário
+        setContatos(contatosRes.data) 
 
         // Gera a mensagem inicial como "sugestão" para o utilizador poder editar
         const availableMeals = pratosRecebidos.filter((m: Prato) => m.disponivel)
@@ -79,13 +84,35 @@ export default function WhatsAppBroadcastPage() {
   const activeContacts = contatos.filter((c) => c.recebeNotificacoes)
   const availableMeals = pratos.filter((m) => m.disponivel)
 
-  // Simulação do envio 
-  const handleSend = () => {
+  // INTEGRAÇÃO REAL COM O BACK-END
+  const handleSend = async () => {
+    if (!messageText.trim()) {
+      alert('A mensagem não pode estar vazia.')
+      return
+    }
+
+    if (!confirm('Tem a certeza de que deseja enviar esta mensagem para todos os clientes ativos?')) {
+      return
+    }
+
     setIsSending(true)
-    setTimeout(() => {
-      setIsSending(false)
+    setSendResult(null)
+
+    try {
+      // Dispara o POST para a rota que acabámos de criar no server.ts
+      const response = await api.post('/whatsapp/disparar-cardapio', { 
+        mensagem: messageText 
+      })
+      
+      setSendResult(response.data) // Recebe { success, enviados, total }
       setIsSent(true)
-    }, 2500) 
+      
+    } catch (error: any) {
+      console.error('Erro ao disparar:', error)
+      alert(error.response?.data?.error || 'Erro ao comunicar com o servidor do WhatsApp.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   // Ecrã de Carregamento Inicial
@@ -98,18 +125,18 @@ export default function WhatsAppBroadcastPage() {
     )
   }
 
-  // Ecrã de Sucesso após Envio
-  if (isSent) {
+  // Ecrã de Sucesso após Envio Real
+  if (isSent && sendResult) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-whatsapp/20">
           <CheckCircle2 className="h-10 w-10 text-whatsapp" />
         </div>
         <h2 className="mb-2 text-2xl font-bold text-foreground">
-          Mensagem Enviada!
+          Transmissão Concluída!
         </h2>
         <p className="mb-8 text-muted-foreground text-center max-w-md">
-          A sua mensagem personalizada foi disparada com sucesso para os {activeContacts.length} clientes da lista de transmissão.
+          A sua mensagem foi enviada com sucesso para <strong>{sendResult.enviados}</strong> de {sendResult.total} clientes da sua base de dados.
         </p>
         <Button onClick={() => setIsSent(false)} variant="outline">
           Fazer novo envio
@@ -160,7 +187,8 @@ export default function WhatsAppBroadcastPage() {
                     Destinatários Ativos
                   </p>
                   <p className="text-3xl font-bold text-foreground">
-                    {activeContacts.length}
+                    {/* Exibe o total se não tiver puxado ainda, ou avisa no botão */}
+                    {activeContacts.length > 0 ? activeContacts.length : '...'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Clientes da lista</p>
                 </div>
@@ -179,8 +207,8 @@ export default function WhatsAppBroadcastPage() {
                 <div className="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 text-yellow-800">
                   <AlertTriangle className="h-5 w-5 shrink-0" />
                   <div className="text-sm">
-                    <p className="font-semibold">Nenhum cliente na lista</p>
-                    <p>Você não possui clientes com a notificação ativada na página de Clientes.</p>
+                    <p className="font-semibold">Aviso de Audiência</p>
+                    <p>O sistema irá buscar os clientes com telemóvel na base de dados no momento do envio.</p>
                   </div>
                 </div>
               )}
@@ -189,18 +217,17 @@ export default function WhatsAppBroadcastPage() {
                 className="w-full bg-whatsapp text-whatsapp-foreground hover:bg-whatsapp/90"
                 size="lg"
                 onClick={handleSend}
-                // O botão agora é bloqueado apenas se não houver clientes OU se ele apagar a mensagem inteira
-                disabled={isSending || activeContacts.length === 0 || messageText.trim() === ''}
+                disabled={isSending || messageText.trim() === ''}
               >
                 {isSending ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    A disparar...
+                    A disparar (Pode demorar)...
                   </>
                 ) : (
                   <>
                     <Send className="mr-2 h-5 w-5" />
-                    Enviar Mensagem ({activeContacts.length} destinatários)
+                    Enviar Mensagem ({activeContacts.length > 0 ? activeContacts.length : 'Todos'})
                   </>
                 )}
               </Button>
@@ -230,7 +257,7 @@ export default function WhatsAppBroadcastPage() {
                   
                   <div className="max-w-[90%] rounded-lg rounded-tr-none bg-[#dcf8c6] p-3 shadow-sm ml-auto relative">
                     <p className="whitespace-pre-wrap text-sm text-[#303030]">
-                      {/* Aqui a magia acontece: reflete exatamente o que está na caixa de texto */}
+                      {/* Reflete exatamente o que está na caixa de texto */}
                       {messageText || "A sua mensagem aparecerá aqui..."}
                     </p>
                     <p className="mt-1 text-right text-[10px] text-gray-500 flex justify-end items-center gap-1">

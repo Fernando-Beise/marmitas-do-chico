@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Eye, Search, Printer, Loader2, CalendarDays } from 'lucide-react'
+import { Eye, Search, Printer, Loader2, CalendarDays, CheckSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -37,8 +37,12 @@ type Pedido = {
     telefone?: string
   }
   endereco: {
-    enderecoCompleto: string
-    complemento?: string | null
+    cidade: string
+    estado: string
+    rua: string
+    numero: string
+    bairro: string
+    complemento: string | null
   } | null
   itens: {
     quantidade: number
@@ -68,10 +72,16 @@ export default function PedidosPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('today') 
   const [isLoading, setIsLoading] = useState(true)
+  // Estados para controlar o Modal de Movimentação em Massa
+  // Estados para controlar o Modal e a Seleção
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([])
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [bulkDestStatus, setBulkDestStatus] = useState('')
+  const [isBulkLoading, setIsBulkLoading] = useState(false)
 
-  useEffect(() => {
-    const fetchPedidos = async () => {
+  const fetchPedidos = async () => {
       try {
+        setIsLoading(true) // Adicionado aqui para o loading aparecer na atualização também
         const response = await api.get('/pedidos')
         setOrders(response.data)
       } catch (error) {
@@ -79,11 +89,12 @@ export default function PedidosPage() {
       } finally {
         setIsLoading(false)
       }
-    }
-
+  }
+  useEffect(() => {
     fetchPedidos()
   }, [])
 
+  
   const formatCurrency = (value: number | string) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -157,8 +168,159 @@ export default function PedidosPage() {
   }
 
   const handlePrintLabels = () => {
-    window.print()
+    console.log("Iniciando impressão...");
+
+    if (filteredOrders.length === 0) {
+      alert('Não existem pedidos na tela para imprimir!');
+      return;
+    }
+
+    // ✅ Pega o conteúdo da área de impressão
+    const printContent = document.querySelector('.print-area')?.innerHTML;
+    
+    if (!printContent) {
+      alert('Erro: Conteúdo de impressão não encontrado!');
+      console.error('Elemento .print-area não existe no DOM');
+      return;
+    }
+
+    // ✅ Cria um iframe temporário
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    
+    if (!iframeDoc) {
+      alert('Erro ao criar iframe de impressão');
+      return;
+    }
+
+    // ✅ Escreve o conteúdo no iframe
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Impressão de Pedidos</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          
+          .print-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+          }
+          
+          .label {
+            border: 2px solid black;
+            padding: 16px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            font-size: 12px;
+            background: white;
+            color: black;
+          }
+          
+          .label h3 {
+            font-weight: bold;
+            font-size: 14px;
+            margin: 0 0 4px 0;
+          }
+          
+          .label p {
+            margin: 2px 0;
+            font-size: 11px;
+          }
+          
+          @media print {
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        ${printContent}
+      </body>
+      </html>
+    `);
+    
+    iframeDoc.close();
+
+    // ✅ Aguarda o iframe carregar e depois imprime
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      
+      // Remove o iframe após imprimir
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
   }
+
+
+  // Seleciona ou remove todos os pedidos filtrados na tela
+  const handleToggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedOrders(filteredOrders.map(order => order.id))
+    } else {
+      setSelectedOrders([])
+    }
+  }
+
+  // Seleciona ou remove um pedido específico
+  const handleToggleOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId) 
+        : [...prev, orderId]                
+    )
+  }
+
+  // Função do modal (agora usa a array selectedOrders)
+  const handleConfirmarMovimentacao = async () => {
+    if (!bulkDestStatus) {
+      alert('Selecione um status de destino!');
+      return;
+    }
+
+    setIsBulkLoading(true);
+
+    try {
+      await api.patch('/pedidos/bulk-status', {
+        pedidoIds: selectedOrders,
+        novoStatus: bulkDestStatus
+      });
+
+      alert(`${selectedOrders.length} pedidos alterados com sucesso!`);
+      
+      setIsBulkModalOpen(false);
+      setSelectedOrders([]);
+      setBulkDestStatus('');
+      fetchPedidos(); 
+      
+    } catch (error) {
+      console.error('Erro ao alterar pedidos:', error);
+      alert('Ocorreu um erro ao atualizar os pedidos.');
+    } finally {
+      setIsBulkLoading(false);
+    }
+  }
+
+  
 
   return (
     <div className="space-y-6 print:space-y-0 print:m-0 print:p-0 print:bg-white w-full">
@@ -173,17 +335,51 @@ export default function PedidosPage() {
             </p>
           </div>
           
-          <Button onClick={handlePrintLabels} className="gap-2 bg-primary">
+          <Button 
+            className="gap-2 bg-primary"
+            onClick={() => {
+              if (filteredOrders.length === 0) {
+                alert('Não existem pedidos na tela para imprimir!');
+                return;
+              }
+              // O window.print() chama a tela de impressão do navegador nativamente
+              handlePrintLabels();
+            }} 
+          >
             <Printer className="h-4 w-4" />
-            Imprimir Etiquetas ({filteredOrders.length})
+            {selectedOrders.length > 0 
+              ? `Imprimir Selecionados (${selectedOrders.length})` 
+              : `Imprimir Todos (${filteredOrders.length})`}
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <div className="flex flex-col xl:flex-row xl:items-center gap-4 justify-between">
-              <CardTitle>Lista de Pedidos</CardTitle>
+            <div className="flex flex-col xl:flex-row xl:items-start gap-4 justify-between">
               
+              {/* TÍTULO E BOTÕES DE AÇÃO RÁPIDA */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <CardTitle>Lista de Pedidos</CardTitle>
+                
+                {/* BOTÃO MÁGICO SÓ FICA ATIVO SE ALGO ESTIVER SELECIONADO */}
+                {/* BOTÃO AGORA AVISA SE VOCÊ ESQUECER DE MARCAR A CAIXINHA */}
+                <Button 
+                  size="sm" 
+                  className="gap-2 bg-slate-800 hover:bg-slate-700 text-white"
+                  onClick={() => {
+                    if (selectedOrders.length === 0) {
+                      alert('⚠️ Marque pelo menos um pedido nas caixinhas da tabela antes de alterar o status!');
+                      return;
+                    }
+                    setIsBulkModalOpen(true);
+                  }}
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  Alterar Status ({selectedOrders.length})
+                </Button>
+              </div>
+
+              {/* FILTROS E PESQUISA */}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -221,6 +417,7 @@ export default function PedidosPage() {
                   </SelectContent>
                 </Select>
               </div>
+
             </div>
           </CardHeader>
           
@@ -228,6 +425,14 @@ export default function PedidosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                <TableHead className="w-12">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                      onChange={handleToggleAll}
+                      checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                    />
+                  </TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Itens e Personalizações</TableHead>
@@ -255,7 +460,18 @@ export default function PedidosPage() {
                   </TableRow>
                 ) : (
                   filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
+                    // Alterar a abertura do TableRow para pintar a linha de cinza se estiver selecionada
+                    <TableRow key={order.id} className={selectedOrders.includes(order.id) ? "bg-slate-50" : ""}>
+                      
+                      {/* CAIXINHA DE SELEÇÃO INDIVIDUAL */}
+                      <TableCell>
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                          checked={selectedOrders.includes(order.id)}
+                          onChange={() => handleToggleOrder(order.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium text-xs">
                         #{order.id.substring(0, 8).toUpperCase()}
                       </TableCell>
@@ -330,14 +546,68 @@ export default function PedidosPage() {
         </Card>
       </div>
 
-      {/* === ÁREA DE IMPRESSÃO (ESCONDIDA NA TELA, VISÍVEL NA FOLHA) === */}
-      <div className="hidden print:grid print:grid-cols-2 print:gap-4 print:w-full">
-        {filteredOrders.map((order) => {
-          const taxa = Number(order.taxaEntrega) || 0;
-          const subtotal = Number(order.total) - taxa;
+      {/* MODAL GERAL DE STATUS */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg border border-border">
+            <h2 className="text-xl font-bold mb-2">Alterar Status dos Pedidos</h2>
+            
+            <p className="text-sm text-muted-foreground mb-6">
+              Você selecionou <strong>{selectedOrders.length}</strong> pedido(s). 
+              Escolha abaixo o novo status que deseja aplicar a todos eles.
+            </p>
+
+            <div className="space-y-4">
+              <label className="text-sm font-medium">Novo Status:</label>
+              
+              <select 
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                value={bulkDestStatus}
+                onChange={(e) => setBulkDestStatus(e.target.value)}
+                disabled={isBulkLoading}
+              >
+                <option value="" disabled>Selecione...</option>
+                <option value="pendente">Pendente</option>
+                <option value="preparando">Preparando</option>
+                <option value="saiu_entrega">Saiu para Entrega</option>
+                <option value="entregue">Entregue</option>
+              </select>
+            </div>
+
+            <div className="mt-8 flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsBulkModalOpen(false)}
+                disabled={isBulkLoading}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleConfirmarMovimentacao}
+                disabled={isBulkLoading}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isBulkLoading ? 'A Mudar...' : 'Confirmar e Notificar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
           
-          return (
-            <div key={order.id} className="border-2 border-black p-4 break-inside-avoid text-sm flex flex-col h-full bg-white text-black">
+      {/* === ÁREA DE IMPRESSÃO (ESCONDIDA NA TELA, VISÍVEL NA FOLHA) === */}
+      {/* === ÁREA DE IMPRESSÃO === */}
+    <div className="print-area hidden">
+  <div className="print-grid">
+    {(selectedOrders.length > 0 
+      ? filteredOrders.filter(order => selectedOrders.includes(order.id))
+      : filteredOrders
+    ).map((order) => {
+      const taxa = Number(order.taxaEntrega) || 0;
+      const subtotal = Number(order.total) - taxa;
+      
+      return (
+        <div key={order.id} className="label">
               
               {/* Cabeçalho da Etiqueta */}
               <div className="flex justify-between items-start border-b border-gray-400 pb-2 mb-2">
@@ -353,12 +623,14 @@ export default function PedidosPage() {
 
               {/* Informações do Cliente */}
               <div className="mb-3">
-                <p className="font-bold text-base">{order.cliente?.nome}</p>
+                <p className="font-bold text-base">{order.cliente?.nome || 'Cliente não identificado'}</p>
                 {order.cliente?.telefone && <p className="text-xs text-gray-700">Tel: {order.cliente.telefone}</p>}
                 
                 <div className="mt-1 p-1 bg-gray-100 border border-gray-300 rounded">
                     <p className="text-xs leading-tight">
-                      {order.endereco?.enderecoCompleto}
+                      {order.endereco?.cidade} - {order.endereco?.estado} <br />
+                      {order.endereco?.rua}, {order.endereco?.numero} - {order.endereco?.bairro}
+                      {order.endereco?.complemento && ` (${order.endereco.complemento})`}
                     </p>
                 </div>
               </div>
@@ -370,14 +642,15 @@ export default function PedidosPage() {
                   {order.itens?.map((i, idx) => (
                     <li key={idx} className="flex flex-col">
                       <div className="font-bold text-base leading-tight flex justify-between">
-                        <span>{i.quantidade}x {i.prato.nome}</span>
+                        {/* CORREÇÃO 1: i.prato?.nome blindado com ? */}
+                        <span>{i.quantidade}x {i.prato?.nome || 'Prato Removido'}</span>
                       </div>
                       
                       {/* Lista de adicionais na etiqueta */}
                       {i.adicionais && i.adicionais.length > 0 && (
                         <div className="pl-3 mt-0.5 text-xs font-semibold text-gray-700">
                           {i.adicionais.map((a, aIdx) => (
-                            <div key={aIdx}>+ {a.quantidade}x {a.adicional?.nome || 'Adicional Excluído'}</div>
+                            <div key={aIdx}>+ {a.quantidade}x {a.adicional?.nome || 'Adicional Removido'}</div>
                           ))}
                         </div>
                       )}
@@ -405,14 +678,15 @@ export default function PedidosPage() {
                 
                 <div className="mt-2 text-center border-2 border-dashed border-gray-400 p-1 rounded">
                   <p className="font-bold text-xs uppercase text-black">
-                    Pagamento: {order.pagamento?.metodo} - {order.pagamento?.status.toUpperCase()}
+                    {/* CORREÇÃO 2: Pagamento blindado com ? em todos os níveis */}
+                    Pagamento: {order.pagamento?.metodo || 'N/A'} - {order.pagamento?.status?.toUpperCase() || 'AGUARDANDO'}
                   </p>
                 </div>
               </div>
 
             </div>
           )
-        })}
+        }) }
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
@@ -421,19 +695,39 @@ export default function PedidosPage() {
             size: A4 portrait;
             margin: 10mm;
           }
-          aside, nav, header { display: none !important; }
+          
+          /* Esconde elementos na tela, mostra na impressão */
+          .print\\:grid {
+            display: grid !important;
+          }
+          
+          .print\\:block {
+            display: block !important;
+          }
+          
+          /* Mostra o grid de impressão */
+          body > div:last-child {
+            display: grid !important;
+          }
+          
+          aside, nav, header, .print\\:hidden { 
+            display: none !important; 
+          }
+          
           body, html, main { 
             width: 100% !important; 
             margin: 0 !important; 
             padding: 0 !important; 
             background: white !important; 
           }
+          
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
         }
       `}} />
+    </div>
     </div>
   )
 }

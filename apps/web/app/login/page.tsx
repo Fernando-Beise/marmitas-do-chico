@@ -26,7 +26,7 @@ export default function LoginPage() {
       localStorage.setItem('adminToken', response.data.token)
       document.cookie = `token=${response.data.token}; path=/; max-age=86400`;
       // Redireciona para a página de home do admin
-      router.push('/admin/cardapio')
+      router.push('/admin')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao fazer login.')
     } finally {

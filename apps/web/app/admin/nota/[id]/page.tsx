@@ -22,7 +22,11 @@ type PedidoNota = {
     telefone: string
   }
   endereco: {
-    enderecoCompleto: string
+    rua: string
+    numero: string
+    bairro: string
+    cidade: string
+    estado: string
     complemento: string | null
   } | null
   itens: {
@@ -154,7 +158,9 @@ export default function DeliveryNotePage() {
           <p className="text-sm font-medium capitalize">{order.metodoEntrega}</p>
           {order.endereco ? (
             <p className="text-sm">
-              {order.endereco.enderecoCompleto}
+              {order.endereco?.cidade} - {order.endereco?.estado} <br />
+              {order.endereco?.rua}, {order.endereco?.numero} - {order.endereco?.bairro}
+              
               {order.endereco.complemento && ` (${order.endereco.complemento})`}
             </p>
           ) : (

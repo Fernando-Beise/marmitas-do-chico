@@ -32,7 +32,8 @@ type PedidoDetalhe = {
     telefone: string
   }
   endereco: {
-    enderecoCompleto: any
+    cidade: string
+    estado: string
     rua: string
     numero: string
     bairro: string
@@ -238,10 +239,10 @@ export default function OrderDetailPage() {
                   <div>
                     <dt className="text-muted-foreground">Endereço</dt>
                     <dd className="font-medium">
-                      {order.endereco 
-                        ? `${order.endereco.enderecoCompleto}`
-                        : 'Retirada no local'
-                      }
+                      {order.endereco?.cidade} - {order.endereco?.estado}
+                    </dd>
+                    <dd className="font-medium">
+                      {order.endereco?.rua}, {order.endereco?.numero} - {order.endereco?.bairro}
                       {order.endereco?.complemento && ` (${order.endereco.complemento})`}
                     </dd>
                   </div>
