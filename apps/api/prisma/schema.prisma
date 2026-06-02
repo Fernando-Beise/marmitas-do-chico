@@ -54,6 +54,7 @@ model Prato {
   descricao   String
   preco       Decimal
   fotoUrl     String?
+  arquivado   Boolean      @default(false)
   disponivel  Boolean      @default(true)
   itens       ItemPedido[]
   adicionais  Adicional[]  @relation("PratoAdicionais")
@@ -126,4 +127,13 @@ model Adicional {
   itensPedidoAdicional ItemPedidoAdicional[]
 
   @@map("adicionais")
+}
+
+// TABELA PARA CONTROLA SE A LOJA ESTÁ ABERTA OU FECHADA
+model LojaConfig {
+  id        String   @id @default("padrao") // Usamos um ID fixo para ter sempre apenas 1 linha
+  aberta    Boolean  @default(false)
+  atualizadoEm DateTime @updatedAt
+
+  @@map("loja")
 }

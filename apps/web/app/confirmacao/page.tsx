@@ -262,7 +262,12 @@ const handleBuscaRua = async (query: string) => {
 
       setResultadoPagamento(response.data)
       clearCart()
-    } catch (error) {
+    } catch (error: any) {
+      if (error.response?.data?.error === 'LOJA_FECHADA') {
+        alert("⚠️ Operação bloqueada: " + error.response.data.message);
+        window.location.href = "/";
+        return;
+      }
       console.error('Erro ao processar pagamento:', error)
       alert('Erro ao processar o pedido. Verifique os dados e tente novamente.')
     } finally {

@@ -4,15 +4,15 @@ import bcrypt from 'bcrypt'
 const prisma = new PrismaClient()
 
 async function main() {
-  const senhaHash = await bcrypt.hash('CultClub-2024', 10)
+  const senhaHash = await bcrypt.hash('senha123', 10)
 
   // Criando o Chico
   await prisma.admin.upsert({
-    where: { email: 'franciscobonfada@gmail.com' },
+    where: { email: 'vendedor@gmail.com' },
     update: {},
     create: {
-      nome: 'Francisco Hernandez Bonfada',
-      email: 'franciscobonfada@gmail.com',
+      nome: 'vendedor nome',
+      email: 'vendedor@gmail.com',
       senha: senhaHash
     }
   })

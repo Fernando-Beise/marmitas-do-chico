@@ -145,3 +145,71 @@ app.post('/whatsapp/validar', async (request: any, reply) => {
         return reply.status(500).send({ error: "Erro interno ao processar envios." });
     }
 });
+
+app.get('/loja/status', async (request, reply) => {
+    try {
+        // Busca a configuração (ou cria a linha padrão se não existir ainda)
+        let config = await prisma.lojaConfig.findUnique({ where: { id: "padrao" } });
+        if (!config) {
+            config = await prisma.lojaConfig.create({ data: { id: "padrao", aberta: true } });
+        }
+
+        let mensagemCalculada = "";
+
+        // SÓ CALCULA O DIA SE A LOJA ESTIVER ABERTA
+        if (config.aberta) {
+            // Pega a hora atual forçando o fuso horário do Brasil (importante para a VPS!)
+            const dataAtual = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+            const horaAtual = dataAtual.getHours();
+            
+            let dataEntrega = new Date(dataAtual);
+
+            // Se for MEIO-DIA (12h) ou mais, a entrega é para AMANHÃ
+            if (horaAtual >= 12) {
+                dataEntrega.setDate(dataEntrega.getDate() + 1);
+            }
+
+            // PULAR FIM DE SEMANA (Se a entrega cair no Sábado ou Domingo, passa para Segunda)
+            if (dataEntrega.getDay() === 6) { // 6 = Sábado
+                dataEntrega.setDate(dataEntrega.getDate() + 2);
+            } else if (dataEntrega.getDay() === 0) { // 0 = Domingo
+                dataEntrega.setDate(dataEntrega.getDate() + 1);
+            }
+
+            // Formata o dia e o mês (ex: 03/04) e o nome do dia
+            const diaFormatado = String(dataEntrega.getDate()).padStart(2, '0');
+            
+            // Array com os nomes dos dias para garantir que fica certinho
+            const diasDaSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+            const nomeDia = diasDaSemana[dataEntrega.getDay()];
+
+            mensagemCalculada = `Estas marmitas são produzidas e entregues para o almoço do dia ${diaFormatado} - ${nomeDia}.`;
+        }
+
+        return reply.send({ 
+            aberta: config.aberta, 
+            mensagem: mensagemCalculada 
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar status da loja:', error);
+        return reply.status(500).send({ error: 'Erro interno.' });
+    }
+});
+
+// 2. Rota para o Chico Ligar/Desligar a loja (Usada no Painel Admin)
+app.patch('/loja/status', async (request: any, reply) => {
+    try {
+        const { aberta } = request.body;
+        
+        const config = await prisma.lojaConfig.upsert({
+            where: { id: "padrao" },
+            update: { aberta },
+            create: { id: "padrao", aberta }
+        });
+
+        return reply.send(config);
+    } catch (error) {
+        return reply.status(500).send({ error: 'Erro ao atualizar status.' });
+    }
+});

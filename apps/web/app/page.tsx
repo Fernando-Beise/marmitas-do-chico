@@ -35,6 +35,24 @@ interface Prato {
 }
 
 export default function HomePage() {
+
+  const [lojaConfig, setLojaConfig] = useState({ aberta: false, mensagem: '' })
+  const [isLoadingLoja, setIsLoadingLoja] = useState(true)
+
+  useEffect(() => {
+    const fetchStatusLoja = async () => {
+      try {
+        const res = await api.get('/loja/status')
+        setLojaConfig(res.data)
+      } catch (error) {
+        console.error("Erro ao carregar status da loja:", error)
+      } finally {
+        setIsLoadingLoja(false)
+      }
+    }
+    fetchStatusLoja()
+  }, [])
+
   const [availableMeals, setAvailableMeals] = useState<Prato[]>([])
   const [loading, setLoading] = useState(true)
   
@@ -153,14 +171,26 @@ export default function HomePage() {
 
       <main className="container mx-auto px-4 py-6">
         <section className="mb-8">
-          <div className="mb-6 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 p-6">
-            <h1 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">
-              Cardápio de Hoje
-            </h1>
-            <p className="text-muted-foreground">
-              Escolha sua marmita caseira feita com ingredientes frescos e muito carinho.
-            </p>
-          </div>
+          <h2>A loja fica aberta do meio dia (12:00) até as nove da manhã (09:00)</h2>
+          {/* BANNER DINÂMICO DE ACORDO COM O STATUS DA LOJA */}
+          {isLoadingLoja ? (
+            <div className="mb-6 rounded-xl bg-muted p-6 animate-pulse h-28" />
+          ) : (
+            <div className={`mb-6 rounded-xl p-6 bg-gradient-to-r ${
+              lojaConfig.aberta 
+                ? 'from-primary/10 to-accent/10 p-6' 
+                : 'from-destructive/10 to-red-500/10 border border-destructive/20'
+            }`}>
+              <h1 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">
+                {lojaConfig.aberta ? 'Cardápio Aberto!' : 'Loja Fechada Temporariamente'}
+              </h1>
+              <p className={lojaConfig.aberta ? 'text-muted-foreground font-medium' : 'text-destructive font-medium'}>
+                {lojaConfig.aberta 
+                  ? lojaConfig.mensagem 
+                  : 'No momento os pedidos estão pausados para produção e entrega das marmitas. Voltamos logo após o almoço!'}
+              </p>
+            </div>
+          )}
 
           {loading ? (
             <div className="py-12 text-center">
@@ -168,6 +198,22 @@ export default function HomePage() {
                 Carregando o cardápio do Chico...
               </p>
             </div>
+          ) : !lojaConfig.aberta ? (
+
+            // CENÁRIO 1: LOJA FECHADA
+            <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-xl border border-dashed border-muted-foreground/30">
+              <h3 className="text-lg font-semibold text-muted-foreground">Cardápio Oculto</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                O menu será liberado assim que iniciarmos um novo ciclo de pedidos.
+              </p>
+            </div>
+          ) : !loading && availableMeals.length === 0 ? (
+
+            <div className="py-12 text-center">
+            <p className="text-lg text-muted-foreground">
+              Nenhuma marmita disponível no momento. Volte mais tarde!
+            </p>
+          </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {availableMeals.map((meal) => (
@@ -182,17 +228,11 @@ export default function HomePage() {
             </div>
           )}
         </section>
-
-        {!loading && availableMeals.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-lg text-muted-foreground">
-              Nenhuma marmita disponível no momento. Volte mais tarde!
-            </p>
-          </div>
-        )}
       </main>
 
-      <FloatingCart />
+      <FloatingCart 
+      
+      />
 
       {/* --- MODAL DE ADICIONAIS COM QUANTIFICADOR --- */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

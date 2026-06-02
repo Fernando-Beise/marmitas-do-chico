@@ -9,11 +9,21 @@ export async function pratosRoutes(app: FastifyInstance) {
     // Captura o aviso da URL para saber se quem está pedindo é o painel de Admin
     const { admin } = request.query as { admin?: string }
 
+    const configLoja = await prisma.lojaConfig.findUnique({ where: { id: "padrao" } });
+            
+    // Se a loja não existir na base ou estiver fechada, bloqueia a compra na hora!
+    if ((!configLoja || configLoja.aberta === false) && admin !== 'true') {
+        return reply.status(403).send({ 
+            error: 'LOJA_FECHADA', 
+            message: 'Os pedidos estão pausados no momento para produção. Tente novamente mais tarde.' 
+        });
+    }
+
     try {
       const pratos = await prisma.prato.findMany({
         // Se a palavra admin for 'true', não aplica nenhum filtro (undefined = traz tudo).
         // Se não for, filtra garantindo que só os pratos com 'disponivel: true' apareçam.
-        where: admin === 'true' ? undefined : { disponivel: true },
+        where: admin === 'true' ? { arquivado: false } : { disponivel: true, arquivado: false },
         include: {
           adicionais: true
         },
@@ -59,6 +69,7 @@ export async function pratosRoutes(app: FastifyInstance) {
           preco: new Prisma.Decimal(preco),
           fotoUrl,
           disponivel: true,
+          arquivado: false,
           // Faz a magia de vincular os IDs selecionados
           adicionais: {
             connect: adicionaisIds?.map(id => ({ id })) || []
@@ -134,15 +145,16 @@ export async function pratosRoutes(app: FastifyInstance) {
     // Processamento da exclusão
     try {
       const { id } = request.params as { id: string }
+      // EM VEZ DE DELETAR, NÓS ATUALIZAMOS O PRATO PARA ARQUIVADO
+      await prisma.prato.update({
+        where: { id: id },
+        data: { arquivado: true }
+      });
 
-      await prisma.prato.delete({
-        where: { id }
-      })
-
-      return reply.status(204).send()
+      return reply.send({ message: 'Prato removido do cardápio com sucesso!' });
     } catch (error) {
-      app.log.error(error)
-      return reply.status(500).send({ message: 'Erro ao excluir a marmita ou registro não encontrado.' })
+        console.error('Erro ao excluir prato:', error);
+        return reply.status(500).send({ error: 'Erro ao remover o prato.' });
     }
   })
 }

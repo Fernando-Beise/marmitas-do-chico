@@ -7,6 +7,17 @@ import { whatsappClient } from '../services/whatsapp'
 export async function pedidosRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
     try {
+
+      const configLoja = await prisma.lojaConfig.findUnique({ where: { id: "padrao" } });
+        
+      // Se a loja não existir na base ou estiver fechada, bloqueia a compra na hora!
+      if (!configLoja || configLoja.aberta === false) {
+          return reply.status(403).send({ 
+              error: 'LOJA_FECHADA', 
+              message: 'Os pedidos estão pausados no momento para produção. Tente novamente mais tarde.' 
+          });
+      }
+
       const body = request.body as any
       
       // LOG VITAL: Vai imprimir no terminal exatamente o que o front-end mandou
