@@ -3,7 +3,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import path from 'path' 
 import dotenv from 'dotenv'
-import { whatsappClient } from './services/whatsapp'; // 1. Importe o cliente no topo
+import { initializeWhatsApp } from './services/whatsapp'
 import { authRoutes } from './routes/auth'
 import { pratosRoutes } from './routes/pratos'
 import { pedidosRoutes } from './routes/pedidos'
@@ -31,9 +31,10 @@ app.register(pratosRoutes, { prefix: '/pratos' })
 app.register(pedidosRoutes, { prefix: '/pedidos' })
 app.register(contatosRoutes, { prefix: '/contatos' })
 app.register(adicionaisRoutes, { prefix: '/adicionais' })
-
+let whatsappSocket: any = null
 const start = async () => {
   try {
+    whatsappSocket = await initializeWhatsApp()
     await app.listen({ port: 3001, host: '0.0.0.0' })
     console.log('API rodando em http://localhost:3001')
   } catch (err) {
@@ -43,12 +44,6 @@ const start = async () => {
 }
 
 start()
-
-// ... (resto das suas importações e inicialização do app)
-
-// 2. INICIALIZA O WHATSAPP JUNTO COM O SERVIDOR
-whatsappClient.initialize().catch((err: any) => console.error("Erro ao iniciar WhatsApp", err));
-
 
 // ROTA PARA VALIDAR NÚMERO DE WHATSAPP EM TEMPO REAL
 app.post('/whatsapp/validar', async (request: any, reply) => {
@@ -60,7 +55,7 @@ app.post('/whatsapp/validar', async (request: any, reply) => {
         }
 
         // TRAVA DE SEGURANÇA: Se o bot estiver offline, liberamos a venda para não dar prejuízo!
-        if (!whatsappClient.info) {
+        if (!whatsappSocket.info) {
             return reply.send({ valido: true, aviso: 'WhatsApp offline, validação ignorada.' });
         }
 
@@ -69,9 +64,8 @@ app.post('/whatsapp/validar', async (request: any, reply) => {
         const numeroBrasil = `55${telefoneLimpo}`;
 
         // Pergunta aos servidores da Meta se o número existe
-        const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
-
-        if (idRegistrado) {
+        const [existe] = await whatsappSocket.onWhatsApp(numeroBrasil);
+        if (existe?.exists){
             return reply.send({ valido: true });
         } else {
             return reply.send({ valido: false, erro: 'Este número não possui um WhatsApp ativo.' });
@@ -87,7 +81,7 @@ app.post('/whatsapp/validar', async (request: any, reply) => {
 // 3. ROTA PARA DISPARAR O CARDÁPIO
     app.post('/whatsapp/disparar-cardapio', async (request: any, reply) => {
     try {
-        if (!whatsappClient.info) {
+        if (!whatsappSocket ||!whatsappSocket.user) {
             return reply.status(503).send({ error: "O WhatsApp ainda não está conectado ou pronto." });
         }
 
@@ -120,14 +114,14 @@ app.post('/whatsapp/validar', async (request: any, reply) => {
             const numeroBrasil = `55${telefoneLimpo}`;
 
             // 3. A MÁGICA: Pede ao WhatsApp para validar e descobrir o ID real (ele resolve o 9º dígito sozinho!)
-            const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+            const [existe] = await whatsappSocket.onWhatsApp(numeroBrasil);
             
             // O whatsapp-web.js exige o formato número@c.us
-            const numeroFormatado = `55${telefoneLimpo}@c.us`; // Assume que todos são do Brasil (+55). Ajuste se necessário.
+            const numeroFormatado = `55${telefoneLimpo}@c.whatsapp.net`; // Assume que todos são do Brasil (+55). Ajuste se necessário.
             
             try {
                 // Envia a mensagem personalizada
-                await whatsappClient.sendMessage(numeroFormatado, mensagem);
+                await whatsappSocket.sendMessage(numeroFormatado, { text: mensagem });
                 enviados++;
                 console.log(`Mensagem enviada para ${cliente.nome} (${telefoneLimpo})`);
                 

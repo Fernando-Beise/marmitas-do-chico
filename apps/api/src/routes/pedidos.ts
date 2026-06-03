@@ -1,10 +1,12 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../db/client'
 import { Prisma } from '@prisma/client'
-import { whatsappClient } from '../services/whatsapp'
+import { initializeWhatsApp } from '../services/whatsapp'
+import { error } from 'node:console'
 
 
 export async function pedidosRoutes(app: FastifyInstance) {
+  let whatsappSocket: any = null
   app.post('/', async (request, reply) => {
     try {
 
@@ -206,7 +208,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
 
       try {
         // Verifica se o WhatsApp está conectado antes de tentar enviar
-        if (whatsappClient.info && body.dadosEntrega?.telefone) {
+        if (whatsappSocket.user && body.dadosEntrega?.telefone) {
           
           // Remove parênteses, traços e espaços do telemóvel da base de dados
           const telefoneLimpo = body.dadosEntrega.telefone.replace(/\D/g, '');
@@ -215,15 +217,15 @@ export async function pedidosRoutes(app: FastifyInstance) {
           const numeroBrasil = `55${telefoneLimpo}`;
 
           // 3. A MÁGICA: Pede ao WhatsApp para validar e descobrir o ID real (ele resolve o 9º dígito sozinho!)
-          const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
-          if (idRegistrado) {
+          const [existe] = await whatsappSocket.onWhatsApp(numeroBrasil);
+          if (existe?.exists) {
             const mensagemConfirmacao = `Olá, *${body.dadosEntrega.nome}*! 👨‍🍳\n\nRecebemos o seu pedido!\n\nO Chico preparará sua marmita com muito carinho.\n\nAvisaremos por aqui quando começar a ser preparada e estiver a caminho. 🛵`;
 
             // Disparamos a mensagem SEM usar o 'await' antes.
             // Porquê? Para não fazer o site do cliente ficar a "pensar" à espera do WhatsApp.
-            whatsappClient.sendMessage(idRegistrado._serialized, mensagemConfirmacao)
+            whatsappSocket.sendMessage(existe._serialized, { text: mensagemConfirmacao })
               .then(() => console.log(`[WHATSAPP] Confirmação de pedido enviada para ${body.dadosEntrega.nome}`))
-              .catch(err => console.error(`[WHATSAPP] Erro ao enviar confirmação para ${body.dadosEntrega.nome}:`, err));
+              .catch(() => console.error(`[WHATSAPP] Erro ao enviar confirmação para ${body.dadosEntrega.nome}:`));
           }else{console.log(`[WHATSAPP] Número ${numeroBrasil} não registrado no WhatsApp. Não foi possível enviar a mensagem de confirmação.`)}
         }
       } catch (err) {
@@ -305,14 +307,14 @@ export async function pedidosRoutes(app: FastifyInstance) {
       // ========================================================
         // 2. DISPARO AUTOMÁTICO DE WHATSAPP POR STATUS
         // ========================================================
-        if (whatsappClient.info && pedidoAtualizado.cliente?.telefone) {
+        if (whatsappSocket.user && pedidoAtualizado.cliente?.telefone) {
             (async () => {
                 try {
                     const telefoneLimpo = pedidoAtualizado.cliente.telefone.replace(/\D/g, '');
                     const numeroBrasil = `55${telefoneLimpo}`;
-                    const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+                    const [existe] = await whatsappSocket.onWhatsApp(numeroBrasil);
 
-                    if (idRegistrado) {
+                    if (existe?.exists) {
                         const nome = pedidoAtualizado.cliente.nome;
                         let mensagem = '';
 
@@ -337,7 +339,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
 
                         // Só envia se o status for um dos mapeados acima
                         if (mensagem !== '') {
-                            await whatsappClient.sendMessage(idRegistrado._serialized, mensagem);
+                            await whatsappSocket.sendMessage(existe._serialized, { text: mensagem });
                             console.log(`[WHATSAPP] Status '${status}' enviado para ${nome}`);
                         }else{
                             console.log(`[WHATSAPP] Status '${status}' não tem mensagem mapeada. Nenhuma mensagem enviada para ${nome}.`);
@@ -385,7 +387,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
         // ========================================================
         // 3. DISPARO DE WHATSAPP EM MASSA (COM DELAY DE SEGURANÇA)
         // ========================================================
-        if (whatsappClient.info) {
+        if (whatsappSocket.user) {
             (async () => {
                 try {
                     // Como o updateMany não devolve os dados completos, precisamos buscar os clientes
@@ -398,9 +400,9 @@ export async function pedidosRoutes(app: FastifyInstance) {
                         if (pedido.cliente?.telefone) {
                             const telefoneLimpo = pedido.cliente.telefone.replace(/\D/g, '');
                             const numeroBrasil = `55${telefoneLimpo}`;
-                            const idRegistrado = await whatsappClient.getNumberId(numeroBrasil);
+                            const [existe] = await whatsappSocket.onWhatsApp(numeroBrasil);
 
-                            if (idRegistrado) {
+                            if (existe?.exists) {
                                 const nome = pedido.cliente.nome;
                                 let mensagem = '';
                                 
@@ -417,7 +419,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
                                 }
 
                                 if (mensagem !== '') {
-                                    await whatsappClient.sendMessage(idRegistrado._serialized, mensagem);
+                                    await whatsappSocket.sendMessage(existe._serialized, { text: mensagem });
                                     console.log(`[WHATSAPP BULK] Status '${novoStatus}' enviado para ${nome}`);
                                     
                                     // DELAY DE 3 SEGUNDOS: Super importante ao mover dezenas de pedidos juntos!
