@@ -41,12 +41,13 @@ export default function ConfirmacaoPage() {
   const [step, setStep] = useState<1 | 2>(1)
   const [resultadoPagamento, setResultadoPagamento] = useState<any>(null)
   const [mpReady, setMpReady] = useState(false)
+const [cpf, setCpf] = useState('')
    useEffect(() => {
     // ✅ Inicializa MercadoPago apenas no cliente
     const initMercadoPago = async () => {
       try {
         const { initMercadoPago } = await import('@mercadopago/sdk-react')
-        initMercadoPago('APP_USR-d5a85935-afec-452c-99ae-9f9846e72430', { 
+        initMercadoPago('APP_USR-9067035e-c11b-4e2b-97af-c61acc4e616c', { 
           locale: 'pt-BR' 
         })
         setMpReady(true)
@@ -60,12 +61,22 @@ export default function ConfirmacaoPage() {
     initMercadoPago()
   }, [])
 
+const formatarCPF = (value: string) => {
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    .substring(0, 14)
+}
+
   // Estados do formulário
   const [nome, setNome] = useState('')
   const [dadosEntrega, setDadosEntrega] = useState({
     nome: '',
     sobrenome: '',
     telefone: '',
+    cpf:'',
     cep: '',
     rua: '',
     numero: '',
@@ -84,8 +95,38 @@ export default function ConfirmacaoPage() {
   const [mostrarSugestoesRua, setMostrarSugestoesRua] = useState(false)
 
  // No topo do arquivo, defina qual município aceita
-const MUNICIPIO_ACEITO = "Santa Cruz do Sul" //process.env.NEXT_PUBLIC_MUNICIPIO 
-const ESTADO_ACEITO = "RS" //process.env.NEXT_PUBLIC_ESTADO 
+const MUNICIPIO_ACEITO = process.env.NEXT_PUBLIC_MUNICIPIO 
+const ESTADO_ACEITO = process.env.NEXT_PUBLIC_ESTADO 
+
+const validarCPF = (cpf: string) => {
+  const cpfLimpo = dadosEntrega.cpf?.replace(/\D/g, '')
+  
+  // Rejeita se não tiver 11 dígitos
+  if (cpfLimpo.length !== 11) return false
+  
+  // Rejeita CPFs conhecidos como inválidos
+  if (/^(\d)\1{10}$/.test(cpfLimpo)) return false
+  
+  // Calcula o primeiro dígito verificador
+  let soma = 0
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(cpfLimpo[i]) * (10 - i)
+  }
+  let resto = (soma * 10) % 11
+  if (resto === 10 || resto === 11) resto = 0
+  if (resto !== parseInt(cpfLimpo[9])) return false
+  
+  // Calcula o segundo dígito verificador
+  soma = 0
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(cpfLimpo[i]) * (11 - i)
+  }
+  resto = (soma * 10) % 11
+  if (resto === 10 || resto === 11) resto = 0
+  if (resto !== parseInt(cpfLimpo[10])) return false
+  
+  return true
+}
 
 // Depois, modifique a função handleBuscaCEP:
 const handleBuscaCEP = async (cep: string) => {
@@ -218,6 +259,11 @@ const handleBuscaRua = async (query: string) => {
         setLoading(false)
         return // Impede de ir para o passo 2
       }
+      if (!validarCPF){
+        alert('O CPF não é válido')
+        setLoading(false)
+        return
+      }
 
       // 3. Se passou no teste (ou se o bot estava offline), avança para o pagamento!
       setStep(2)
@@ -234,6 +280,12 @@ const handleBuscaRua = async (query: string) => {
   const handleFinalizarPedido = async (paymentFormData: any) => {
     setLoading(true)
     try {
+
+      if (paymentFormData.paymentType === 'bank_transfer' && !validarCPF) {
+        alert('CPF válido é obrigatório para pagamento via PIX')
+        setLoading(false)
+        return
+      }
       const itensPedido = cart.map((item: any) => ({
         pratoId: item.pratoId || item.id,
         quantidade: item.quantidade,
@@ -249,7 +301,8 @@ const handleBuscaRua = async (query: string) => {
           nome: nome,
           sobrenome: dadosEntrega.sobrenome,
           telefone: dadosEntrega.telefone,
-          cep: dadosEntrega.cep,
+          cpf: dadosEntrega.cpf,
+	  cep: dadosEntrega.cep,
           rua: dadosEntrega.rua,
           numero: dadosEntrega.numero,
           bairro: dadosEntrega.bairro,
@@ -372,9 +425,9 @@ const handleBuscaRua = async (query: string) => {
         {step === 1 && (
           <form onSubmit={handleIrParaPagamento} className="space-y-6">
             {/* Contato */}
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
               <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider mb-2">
-                Quem vai receber
+                Nome do Comprador
               </h3>
 
               <div>
@@ -385,7 +438,7 @@ const handleBuscaRua = async (query: string) => {
                   value={nome}
                   onChange={e => setNome(e.target.value)}
                   className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all"
-                  placeholder="Ex: Fernando Silva"
+                  placeholder="Ex: Fernando"
                 />
               </div>
 
@@ -397,25 +450,43 @@ const handleBuscaRua = async (query: string) => {
                   className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
                   value={dadosEntrega.sobrenome}
                   onChange={(e) => setDadosEntrega({ ...dadosEntrega, sobrenome: e.target.value })}
-                />
+                  placeholder="Ex: Beise"
+	        />
               </div>
 
-              <div>
+              {/* ✅ CAMPO CPF - APARECE SEMPRE (será validado se for PIX) */}
+          
+            <h3 className="font-bold text-sm uppercase text-muted-foreground tracking-wider">
+              Dados Pessoais
+            </h3>
+            <div>
+              <label className="text-sm font-semibold mb-1.5 block">CPF (obrigatório para PIX)</label>
+              <input
+                type="text"
+                placeholder="000.000.000-00"
+                value={dadosEntrega.cpf}
+                onChange={(e) => setDadosEntrega({ ...dadosEntrega, cpf: formatarCPF(e.target.value) })}
+                maxLength={14}
+                className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all"
+              />
+            </div>
+
+	    <div>
                 <label className="block text-sm font-medium">Telefone / WhatsApp</label>
                 <input
                   type="text"
                   required
                   placeholder="(51) 99999-9999"
-                  className="w-full border rounded p-2 border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+                  className="w-full border rounded p-2 border-input bg-background focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   value={dadosEntrega.telefone}
                   onChange={(e) => setDadosEntrega({
                     ...dadosEntrega,
                     telefone: formatarTelefone(e.target.value)
                   })}
                 />
-              </div>
-
             </div>
+          </div>
+        
 
             {/* Endereço com Autocomplete */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
@@ -558,8 +629,8 @@ const handleBuscaRua = async (query: string) => {
           {mpReady ? (
             <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
               <Payment
-                key={totalPrice} // ✅ força re-render ao mudar valor
-                initialization={{ amount: totalPrice }}
+                key={totalPrice}
+                initialization={{ amount: Number(totalPrice) }}
                 customization={{
                   paymentMethods: {
                     creditCard: "all",
@@ -585,7 +656,7 @@ const handleBuscaRua = async (query: string) => {
             </div>
           )}
         </div>
-        )}
+      )}
       </main>
     </div>
   )

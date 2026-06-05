@@ -17,7 +17,7 @@ export function Header() {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold leading-tight text-foreground">
-              Marmitas do Chico
+              Chico Pratos Especiais
             </span>
             <span className="text-xs text-muted-foreground">
               Comida caseira com amor

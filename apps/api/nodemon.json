@@ -1,0 +1,15 @@
+{
+  "watch": ["src"],
+  "ignore": [
+    "node_modules",
+    "dist",
+    "auth_info",
+    "auth_info_baileys",
+    ".wwebjs_auth",
+    "*.db",
+    "*.log"
+  ],
+  "ext": "ts,js",
+  "exec": "ts-node src/server.ts",
+  "delay": 1000
+}

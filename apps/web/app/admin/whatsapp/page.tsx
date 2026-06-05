@@ -64,7 +64,7 @@ export default function WhatsAppBroadcastPage() {
           availableMeals.forEach((meal: Prato) => {
             defaultMessage += `- ${meal.nome} - ${formatCurrency(meal.preco)}\n`
           })
-          defaultMessage += `\nPeça já pelo nosso site!\nhttps://marmitasdochico.com.br`
+          defaultMessage += `\nPeça já pelo nosso site!\nhttps://chicopratosespeciais.com`
           setMessageText(defaultMessage)
         } else {
           // Se não houver pratos, coloca uma mensagem base de aviso
@@ -247,7 +247,7 @@ export default function WhatsAppBroadcastPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-white">
-                      Marmitas do Chico
+                      Chico Pratos Especiais
                     </p>
                     <p className="text-[10px] text-white/70">Conta Comercial</p>
                   </div>

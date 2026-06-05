@@ -3,10 +3,12 @@ node_modules/
 
 # Variáveis de Ambiente (Segurança - Cobre todas as variações)
 .env
+.env.*
 .env*.local
 .env.development
 .env.test
 .env.production
+!.env.example
 
 # Pastas de Build / Compilação
 dist/

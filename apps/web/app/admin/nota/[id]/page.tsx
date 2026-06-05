@@ -143,7 +143,7 @@ export default function DeliveryNotePage() {
             <UtensilsCrossed className="h-6 w-6" />
           </div>
           <h1 className="text-xl font-bold uppercase tracking-wider text-black">
-            Marmitas do Chico
+            Chico Pratos Especiais
           </h1>
           <p className="text-sm font-semibold">Pedido #{order.id.substring(0, 8).toUpperCase()}</p>
           <p className="text-xs text-gray-600">{formatDate(order.criadoEm)}</p>

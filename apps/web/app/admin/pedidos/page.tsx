@@ -612,7 +612,7 @@ export default function PedidosPage() {
               {/* Cabeçalho da Etiqueta */}
               <div className="flex justify-between items-start border-b border-gray-400 pb-2 mb-2">
                 <div>
-                  <h3 className="font-bold text-lg leading-tight uppercase">Marmitas do Chico</h3>
+                  <h3 className="font-bold text-lg leading-tight uppercase">Chico Pratos Especiais</h3>
                   <p className="text-xs text-gray-600">ID: #{order.id.substring(0, 8).toUpperCase()}</p>
                 </div>
                 <div className="text-right">

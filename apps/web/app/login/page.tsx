@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError('')
     try {
       // Chamada para o backend para autenticar e obter o token JWT
-      const response = await axios.post('http://localhost:3001/auth/login', {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
         email,
         senha
       })

@@ -5,10 +5,13 @@
 
 import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
+import fs from 'fs';
 
-let whatsappSocket: any = null
+export let whatsappSocket: any = null
+export const getWhatsappSocket = () => whatsappSocket;
 let isWhatsappReady = false
-import qrcode from 'qrcode-terminal'
+let qrCodeAtual: string | null = null;
+export const getQrCodeAtual = () => qrCodeAtual;
 export async function initializeWhatsApp() {
   try {
     console.log('🔄 Inicializando WhatsApp com Baileys...')
@@ -18,7 +21,7 @@ export async function initializeWhatsApp() {
     // ✅ Criar socket do Baileys (muito mais leve que whatsapp-web.js)
     whatsappSocket = makeWASocket({
       auth: state,
-      browser: ['Marmitas do Chico', 'Safari', '1.0.0'],
+      browser: ['Chico Pratos Especiais', 'Safari', '1.0.0'],
       syncFullHistory: false // Não sincroniza histórico completo (economiza RAM)
     })
 
@@ -31,16 +34,15 @@ export async function initializeWhatsApp() {
       const { connection, lastDisconnect, qr } = update
 
       if (qr) {
-        console.log('\n📱 Escaneie este QR Code no WhatsApp:\n')
-        qrcode.generate(qr, { small: true }) // Renderiza QR visual
-        console.log('\nOu acesse este link no WhatsApp:')
-        console.log(qr) // Link como fallback
+        qrCodeAtual = qr
+        console.log('\nNovo QR code gerado. Aguardando leitura...')
       }
 
       if (connection === 'connecting') {
         console.log('⏳ Conectando ao WhatsApp...')
       } else if (connection === 'open') {
         isWhatsappReady = true
+	qrCodeAtual = null
         console.log('✅ WhatsApp conectado com sucesso!')
         console.log(`📲 Conectado como: ${whatsappSocket.user?.name}`)
       } else if (connection === 'close') {
@@ -51,7 +53,27 @@ export async function initializeWhatsApp() {
           console.log('🔄 Tentando reconectar ao WhatsApp...')
           setTimeout(() => initializeWhatsApp(), 3000)
         } else {
-          console.log('❌ WhatsApp desconectado (logout)')
+	   qrCodeAtual = null; 
+	   console.log('❌ WhatsApp desconectado (logout). Limpando sessão...');
+	   
+	   if (whatsappSocket) {
+               whatsappSocket.ev.removeAllListeners();
+           }
+	   try {
+               // Apaga a pasta de sessão fisicamente do disco
+               // ATENÇÃO: Confirme se a sua pasta se chama 'auth_info_baileys' mesmo
+               fs.rmSync('./auth_info', { recursive: true, force: true });
+               console.log('🗑️ Pasta de arquivos de sessão apagada com sucesso!');
+           } catch (err) {
+               console.log('Aviso: A pasta já não existia.');
+           }
+	   setTimeout(() => {	   
+    	   // 2. A MÁGICA: Mandamos o sistema reiniciar com a "memória limpa" 
+    	   // após 2 segundos para gerar um novo QR Code automaticamente!
+    	   
+        	console.log('🔄 Reiniciando serviço para gerar novo QR Code...');
+        	initializeWhatsApp();
+    	   }, 2000);
         }
       }
     })
@@ -64,11 +86,6 @@ export async function initializeWhatsApp() {
     console.error('❌ Erro ao inicializar WhatsApp:', error)
     throw error
   }
-}
-
-// Função para obter o socket (usar nas rotas)
-export function getWhatsappSocket() {
-  return whatsappSocket
 }
 
 // Função para verificar se está pronto

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Cria uma instância do axios 
 export const api = axios.create({
-  baseURL: 'http://localhost:3001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
 });
 
 // Interceptor para injetar o token automaticamente em todas as chamadas
