@@ -1,4 +1,4 @@
-# 🍲 Marmitas do Chico
+# Marmitas do Chico
 
 > **Sistema completo de e-commerce e gestão de delivery desenvolvido como Projeto Integrador.**
 
