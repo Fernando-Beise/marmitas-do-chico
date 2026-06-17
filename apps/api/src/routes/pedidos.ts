@@ -98,12 +98,28 @@ export async function pedidosRoutes(app: FastifyInstance) {
         }
       });
 
-      // 3. Validação de Disponibilidade: Faltou algum prato?
-      if (pratosNoBanco.length !== idsDosPratos.length) {
-	return reply.status(400).send({
-           error: 'Ops! Um ou mais itens do seu carrinho não estão mais disponíveis no cardápio.'
-        });
-      }
+// 3. Descobre quais pratos estão com problema (arquivados ou indisponíveis)
+    const pratosComProblema = pratosNoBanco.filter(prato => 
+      prato.arquivado === true || prato.disponivel === false
+    );
+
+    // 4. Se tiver algum prato com problema, ou se o prato foi até apagado do banco
+    if (pratosComProblema.length > 0 || pratosNoBanco.length !== idsDosPratos.length) {
+      
+      const idsIndisponiveis = pratosComProblema.map(p => p.id);
+      
+      // Acha os que foram literalmente deletados do banco (não retornaram na busca)
+      const idsEncontrados = pratosNoBanco.map(p => p.id);
+      const idsDeletados = idsDosPratos.filter((id: string) => !idsEncontrados.includes(id));
+
+      const idsParaRemover = [...idsIndisponiveis, ...idsDeletados];
+
+      return reply.status(400).send({ 
+        erro: 'Alguns pratos do seu carrinho esgotaram ou foram removidos do cardápio.',
+        idsRemover: idsParaRemover // Manda a lista suja de volta pro Frontend!
+      });
+    }
+
 
       // 4. Validação Anti-Fraude (Preços): Compara o valor do Front com o valor do Banco
       for (const item of body.itens) {
@@ -137,6 +153,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
           enderecoId: novoEndereco.id,
           total: new Prisma.Decimal(body.total),
           status: 'pendente',
+	  taxa: body.taxa || 0,
           itens: {
             create: body.itens.map((item: any) => {
               
@@ -206,6 +223,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
 
       //  VALIDAÇÃO: Email é obrigatório
       console.log("Email:", emailPagador)
+      console.log("CPF:", cpfPagador)
 
       if(isPix && !validarCPF(cpfPagador)) {
           return reply.status(400).send({
@@ -406,7 +424,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
         }
       },
       orderBy: {
-        criadoEm: 'desc'
+        atualizadoEm: 'desc'
       }
     })
     return pedidos

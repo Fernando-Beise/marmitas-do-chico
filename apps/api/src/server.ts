@@ -98,21 +98,21 @@ app.post('/webhooks/mercadopago', async (request, reply) => {
         });
 
         if (!pedidoAtual || pedidoAtual?.status === 'APROVADO' || pedidoAtual?.status === 'approved') {console.log("Pedido não encontrado ou já aprovado");return}
-	  const paymentId = orderData.transactions?.payments?.[0]?.id;          
+	  const paymentId = orderData.id;          
 
-          console.log(`✅ [WEBHOOK] PIX Aprovado! Atualizando pedido ${idDoPedido}...`);
+          console.log(`✅ [WEBHOOK] PIX Aprovado! Atualizando pedido ${idDoPedido}... idTransacaoMp: ${String(paymentId)}`);
 
           // Atualiza o Pagamento
 	  let pagoEm = new Date();
           await prisma.pagamento.updateMany({
-            where: { idTransacaoMp: String(paymentId) },
-            data: { status: 'APROVADO', pagoEm: pagoEm }
+            where: { pedidoId: idDoPedido },
+            data: { status: 'aprovado', pagoEm: pagoEm, idTransacaoMp: String(paymentId) }
           });
 
           // Atualiza o Pedido
           await prisma.pedido.update({
             where: { id: idDoPedido },
-            data: { status: 'aprovado' }
+            data: { status: 'pendente' }
           });
 
           // 4. A MÁGICA FINAL: Dispara o WhatsApp avisando que a comida vai ser feita!
@@ -308,22 +308,25 @@ app.get('/loja/status', async (request, reply) => {
     try {
         // Busca a configuração (ou cria a linha padrão se não existir ainda)
         let config = await prisma.lojaConfig.findUnique({ where: { id: "padrao" } });
-        if (!config) {
-            config = await prisma.lojaConfig.create({ data: { id: "padrao", aberta: true } });
-        }
-
+	let statusReal = config?.aberta ?? true;
         let mensagemCalculada = "";
-
+	
         // SÓ CALCULA O DIA SE A LOJA ESTIVER ABERTA
-        if (config.aberta) {
+        if (statusReal) {
             // Pega a hora atual forçando o fuso horário do Brasil (importante para a VPS!)
             const dataAtual = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
             const horaAtual = dataAtual.getHours();
+	    const minutosAtual = (horaAtual *60) + dataAtual.getMinutes();
+
+	    const inicioPausa = Number(process.env.HORARIO_PAUSA_INICIO || 690);
+	    const fimPausa = Number(process.env.HORARIO_PAUSA_FIM || 810);
+
+	    
             
             let dataEntrega = new Date(dataAtual);
 
-            // Se for MEIO-DIA (12h) ou mais, a entrega é para AMANHÃ
-            if (horaAtual >= 12) {
+            // Se for MEIO-DIA (13h) ou mais, a entrega é para AMANHÃ
+            if (horaAtual >= 13) {
                 dataEntrega.setDate(dataEntrega.getDate() + 1);
             }
 
@@ -336,16 +339,23 @@ app.get('/loja/status', async (request, reply) => {
 
             // Formata o dia e o mês (ex: 03/04) e o nome do dia
             const diaFormatado = String(dataEntrega.getDate()).padStart(2, '0');
-            
+            const mesFormatado = String(dataEntrega.getMonth() + 1).padStart(2, '0');
             // Array com os nomes dos dias para garantir que fica certinho
             const diasDaSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
             const nomeDia = diasDaSemana[dataEntrega.getDay()];
 
-            mensagemCalculada = `Estas marmitas são produzidas e entregues para o almoço do dia ${diaFormatado} - ${nomeDia}.`;
+	    // 3. A Mágica do Override: Se estiver na hora do rush, força o fechamento
+            if (minutosAtual >= inicioPausa && minutosAtual < fimPausa) {
+                statusReal = false; // Sobrescreve a variável para FECHADO sem alterar o banco!
+                mensagemCalculada = "Fechado temporariamente (11:30 às 13:30) para entregas do almoço.";
+            }else{
+                mensagemCalculada = `Estas marmitas são produzidas e entregues para o almoço do dia ${diaFormatado}/${mesFormatado} - ${nomeDia}.`;
+	    }
         }
 
         return reply.send({ 
-            aberta: config.aberta, 
+            aberta: statusReal, 
+	    statusNoBanco: config?.aberta ?? true,
             mensagem: mensagemCalculada 
         });
 

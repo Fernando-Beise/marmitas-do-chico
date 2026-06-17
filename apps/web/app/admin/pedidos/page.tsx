@@ -31,6 +31,7 @@ type Pedido = {
   total: number
   status: string
   criadoEm: string
+  atualizadoEm: string
   taxaEntrega?: number
   cliente: {
     nome: string
@@ -143,7 +144,7 @@ export default function PedidosPage() {
     
     let matchesDate = true
     if (dateFilter !== 'all') {
-      const orderDate = new Date(order.criadoEm)
+      const orderDate = new Date(order.atualizadoEm)
       const today = new Date()
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
@@ -521,7 +522,7 @@ export default function PedidosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {formatDate(order.criadoEm)}
+                        {formatDate(order.atualizadoEm)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -616,8 +617,14 @@ export default function PedidosPage() {
                   <p className="text-xs text-gray-600">ID: #{order.id.substring(0, 8).toUpperCase()}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold">{new Date(order.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                  <p className="text-xs">{new Date(order.criadoEm).toLocaleDateString('pt-BR')}</p>
+                  <p className="font-bold">
+			Pedido Feito: {new Date(order.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+		  	{new Date(order.criadoEm).toLocaleDateString('pt-BR')}
+		  </p>
+                  <p className="text-xs">
+		  	Pedido concluido: {new Date(order.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(order.atualizadoEm).toLocaleDateString('pt-BR')}
+		  </p>
                 </div>
               </div>
 

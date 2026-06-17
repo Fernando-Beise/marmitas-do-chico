@@ -38,10 +38,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [mounted, setMounted] = useState(false)
 
+  // FUNÇÃO ÚNICA DE SINCRONIZAÇÃO E VALIDADE (O Cérebro do Carrinho)
   const sincronizarCarrinho = () => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('marmitas_chico_cart')
+      const tempoSalvo = localStorage.getItem('marmitas_chico_cart_timestamp')
+
       if (saved) {
+        if (tempoSalvo) {
+          const tempoAtual = new Date().getTime();
+          const tempoDoCarrinho = Number(tempoSalvo);
+          const VALIDADE_MAXIMA = 1 * 60 * 60 * 1000; // 1 hora de validade
+
+          // Se passou de 1 hora, varre tudo!
+          if (tempoAtual - tempoDoCarrinho > VALIDADE_MAXIMA) {
+            console.log("Carrinho expirado. Limpando...");
+            localStorage.removeItem('marmitas_chico_cart');
+            localStorage.removeItem('marmitas_chico_cart_timestamp');
+            setCart([]);
+            return;
+          }
+        }
+        
+        // Se está dentro da validade, carrega normal
         setCart(JSON.parse(saved))
       } else {
         setCart([])
@@ -62,17 +81,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Helper para atualizar o relógio sempre que mexer no carrinho
+  const renovarTempoDoCarrinho = () => {
+    localStorage.setItem('marmitas_chico_cart_timestamp', new Date().getTime().toString());
+  }
+
   const addItem = (novoItem: any) => {
-    // 2. A MÁGICA ESTÁ AQUI: Aceitamos tudo o que vem da Home perfeitamente
     const itemNormalizado: CartItem = {
-      id: novoItem.id, // O UUID gerado na Home para não misturar marmitas
+      id: novoItem.id,
       pratoId: novoItem.pratoId || novoItem.id,
       nome: novoItem.nome || novoItem.name,
       descricao: novoItem.descricao || novoItem.description,
       precoUnitario: Number(novoItem.precoUnitario || novoItem.preco || novoItem.price || 0),
       fotoUrl: novoItem.fotoUrl || novoItem.image || null,
-      quantidade: novoItem.quantidade || 1, // AGORA PEGA A QUANTIDADE DA HOME!
-      adicionaisEscolhidos: novoItem.adicionaisEscolhidos || [], // AGORA GUARDA OS ADICIONAIS!
+      quantidade: novoItem.quantidade || 1,
+      adicionaisEscolhidos: novoItem.adicionaisEscolhidos || [],
       preco: Number(novoItem.precoUnitario || novoItem.preco || 0)
     }
 
@@ -88,6 +111,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     localStorage.setItem('marmitas_chico_cart', JSON.stringify(currentCart))
+    renovarTempoDoCarrinho() // <--- Atualiza o relógio!
     window.dispatchEvent(new Event('carrinho-atualizado'))
   }
 
@@ -97,6 +121,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const newCart = currentCart.filter((item) => item.id !== id)
     
     localStorage.setItem('marmitas_chico_cart', JSON.stringify(newCart))
+    renovarTempoDoCarrinho() // <--- Atualiza o relógio!
     window.dispatchEvent(new Event('carrinho-atualizado'))
   }
 
@@ -112,18 +137,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     )
     
     localStorage.setItem('marmitas_chico_cart', JSON.stringify(newCart))
+    renovarTempoDoCarrinho() // <--- Atualiza o relógio!
     window.dispatchEvent(new Event('carrinho-atualizado'))
   }
 
   const clearCart = () => {
     localStorage.removeItem('marmitas_chico_cart')
+    localStorage.removeItem('marmitas_chico_cart_timestamp') // <--- Apaga o relógio também!
     window.dispatchEvent(new Event('carrinho-atualizado'))
   }
 
-  // Apenas a contagem de marmitas
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantidade, 0)
   
-  // 3. CÁLCULO TOTAL CORRIGIDO: Soma o prato + os adicionais!
   const totalPriceCalculated = cart.reduce((sum, item) => {
     const basePrice = Number(item.precoUnitario || item.preco || 0);
     const listaAdicionais = Array.isArray(item.adicionaisEscolhidos) ? item.adicionaisEscolhidos : [];

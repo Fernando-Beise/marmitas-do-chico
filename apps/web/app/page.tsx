@@ -171,7 +171,7 @@ export default function HomePage() {
 
       <main className="container mx-auto px-4 py-6">
         <section className="mb-8">
-          <h2>A loja fica aberta do meio dia (12:00) até as nove da manhã (09:00)</h2>
+          <h2>A loja fica fechada das onze e meia (11:30) até às uma e meia (13:30)</h2>
           {/* BANNER DINÂMICO DE ACORDO COM O STATUS DA LOJA */}
           {isLoadingLoja ? (
             <div className="mb-6 rounded-xl bg-muted p-6 animate-pulse h-28" />

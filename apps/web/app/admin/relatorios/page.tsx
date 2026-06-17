@@ -24,7 +24,8 @@ type Pedido = {
   total: number
   status: string
   criadoEm: string
-  cliente: {
+  atualizadoEm: string  
+cliente: {
     nome: string
     telefone?: string
   }
@@ -93,7 +94,7 @@ export default function RelatoriosPage() {
     // Processamento de cada pedido
     orders.forEach((order) => {
       const isCancelled = order.status === 'cancelado'
-      const date = new Date(order.criadoEm)
+      const date = new Date(order.atualizadoEm)
 
       // Contagem de Status Geral
       if (order.status === 'pendente' || order.status === 'preparando') pedidosPendentes++

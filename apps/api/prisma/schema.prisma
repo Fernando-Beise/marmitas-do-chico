@@ -70,7 +70,9 @@ model Pedido {
   endereco    Endereco     @relation(fields: [enderecoId], references: [id])
   status      String       @default("pendente")
   total       Decimal
+  taxa	      Decimal	   @default(0)
   criadoEm   DateTime     @default(now())
+  atualizadoEm DateTime	   @updatedAt
   itens       ItemPedido[]
   pagamento   Pagamento?
 

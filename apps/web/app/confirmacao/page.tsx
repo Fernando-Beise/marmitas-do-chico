@@ -7,9 +7,18 @@ import { ArrowLeft, CheckCircle, Copy, QrCode, MapPin, Loader2 } from 'lucide-re
 import { Header } from '@/components/storefront/header'
 import { useCart } from '../../lib/cart-context'
 import { api } from '../../services/api'
-
+import { TAXAS_BAIRRO, LOCAIS_ISENTOS } from '../../utils/taxas'
 import { initMercadoPago, Payment } from '@mercadopago/sdk-react'
 
+
+const normalizarTexto = (texto: string) => {
+  if (!texto) return '';
+  return texto
+    .normalize('NFD') // Separa os acentos das letras (ex: 'é' vira 'e' + '´')
+    .replace(/[\u0300-\u036f]/g, '') // Remove os acentos de vez
+    .toLowerCase() // Passa tudo para minúsculo
+    .trim(); // Arranca espaços sobrando no começo e no fim
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -36,13 +45,18 @@ const formatarTelefone = (value: string) => {
 }
 
 export default function ConfirmacaoPage() {
-  const { cart, totalPrice, clearCart } = useCart()
+  const { cart, totalPrice, clearCart, removeItem } = useCart()
+  const [valorFinal, setValorFinal] = useState<number>(totalPrice)
+  const [taxaEntrega, setTaxaEntrega] = useState<number>(0);
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
   const [resultadoPagamento, setResultadoPagamento] = useState<any>(null)
   const [mpReady, setMpReady] = useState(false)
-const [cpf, setCpf] = useState('')
-   useEffect(() => {
+  const [cpf, setCpf] = useState('')
+
+
+  useEffect(() => {
+
     // ✅ Inicializa MercadoPago apenas no cliente
     const initMercadoPago = async () => {
       try {
@@ -94,12 +108,37 @@ const formatarCPF = (value: string) => {
   const [sugestoesRua, setSugestoesRua] = useState<any[]>([])
   const [mostrarSugestoesRua, setMostrarSugestoesRua] = useState(false)
 
+  useEffect(() => {
+    if (!dadosEntrega.bairro) return;
+
+    const cepLimpo = dadosEntrega.cep?.replace(/\D/g, '') || '';
+    const bairroLimpo = normalizarTexto(dadosEntrega.bairro);    
+    const numeroLimpo = dadosEntrega.numero?.replace(/\D/g, '') || '';
+
+    const isento = LOCAIS_ISENTOS.some(local =>
+      cepLimpo === local.cep && numeroLimpo === local.numero
+    );
+
+    let valorCalculadoDaTaxa = 0;
+
+    // Se NÃO bateu com o Km da isenção e NÃO bateu com os nomes, cobra a taxa
+    if (!isento) {
+      valorCalculadoDaTaxa = TAXAS_BAIRRO[bairroLimpo] !== undefined ? TAXAS_BAIRRO[bairroLimpo] : 10.00;
+    }
+
+    setTaxaEntrega(valorCalculadoDaTaxa);
+    setValorFinal(valorCalculadoDaTaxa + totalPrice);
+  }, [dadosEntrega.cep, dadosEntrega.bairro, dadosEntrega.rua, dadosEntrega.numero, totalPrice]);
+
+
  // No topo do arquivo, defina qual município aceita
 const MUNICIPIO_ACEITO = process.env.NEXT_PUBLIC_MUNICIPIO 
 const ESTADO_ACEITO = process.env.NEXT_PUBLIC_ESTADO 
 
 const validarCPF = (cpf: string) => {
-  const cpfLimpo = dadosEntrega.cpf?.replace(/\D/g, '')
+  if (!cpf) return false;
+
+  const cpfLimpo = cpf.replace(/\D/g, '');
   
   // Rejeita se não tiver 11 dígitos
   if (cpfLimpo.length !== 11) return false
@@ -166,7 +205,7 @@ const handleBuscaCEP = async (cep: string) => {
         limparCamposEndereco()
         return
       }
-
+	
       // 3. Sucesso! Preenche tudo.
       setDadosEntrega(prev => ({
         ...prev,
@@ -237,10 +276,56 @@ const handleBuscaRua = async (query: string) => {
   }
 
   const handleIrParaPagamento = async (e: React.FormEvent) => {
+    console.log('ta entrando')
     e.preventDefault()
-    
+    let valido = true;
+    const cpfValido = validarCPF(dadosEntrega.cpf)
+      if (!cpfValido) {
+        alert('CPF válido é obrigatório')
+        setLoading(false)
+	valido=false;
+        return
+      }
+     console.log('cpf valido')
+      const cepLimpo = dadosEntrega.cep?.replace(/\D/g, '') || '';
+      if (cepLimpo.length !== 8) {
+        alert('Por favor, digite um CEP válido com 8 números.');
+        setLoading(false);
+	valido=false;
+        return;
+      }
+
+     console.log('cep valido')
+      // 3. Trava de Rua e Bairro vazios (Impede o malandrinho do CEP "15")
+      if (!dadosEntrega.rua || dadosEntrega.rua.trim() === '') {
+        alert('O nome da rua está vazio. Informe um CEP válido para preencher automaticamente');
+        setLoading(false);
+	valido=false;
+        return;
+      }
+
+     console.log('rua existe')
+      if (!dadosEntrega.bairro || dadosEntrega.bairro.trim() === '') {
+        alert('O bairro está vazio. Informe um CEP válido para preencher automaticamente');
+        setLoading(false);
+	valido=false;
+        return;
+      }
+
+     console.log('bairro existe')
+      // 4. Trava do Número (A única coisa que o cliente digita manualmente além do CEP)
+      if (!dadosEntrega.numero || dadosEntrega.numero.trim() === '') {
+        alert('Por favor, informe o número do endereço.');
+        setLoading(false);
+	valido=false;
+        return;
+      }
+
+     console.log('numero existe')
+
     if (cart.length === 0) {
       alert('O seu carrinho está vazio!')
+	valido=false;
       return
     }
 
@@ -259,19 +344,21 @@ const handleBuscaRua = async (query: string) => {
         setLoading(false)
         return // Impede de ir para o passo 2
       }
-      if (!validarCPF){
+      if (!cpfValido){
         alert('O CPF não é válido')
         setLoading(false)
         return
       }
-
+      
       // 3. Se passou no teste (ou se o bot estava offline), avança para o pagamento!
       setStep(2)
 
     } catch (error) {
       // Se a API falhar (ex: erro de rede), deixamos passar por segurança
       console.error('Erro ao validar WhatsApp:', error)
-      setStep(2)
+      if(valido===true){
+         setStep(2)
+      }
     } finally {
       setLoading(false)
     }
@@ -281,11 +368,6 @@ const handleBuscaRua = async (query: string) => {
     setLoading(true)
     try {
 
-      if (paymentFormData.paymentType === 'bank_transfer' && !validarCPF) {
-        alert('CPF válido é obrigatório para pagamento via PIX')
-        setLoading(false)
-        return
-      }
       const itensPedido = cart.map((item: any) => ({
         pratoId: item.pratoId || item.id,
         quantidade: item.quantidade,
@@ -295,7 +377,8 @@ const handleBuscaRua = async (query: string) => {
       console.log('Itens do pedido:', itensPedido)
       const response = await api.post('/pedidos', {
         clienteId: "Ajustado pelo backend",
-        total: totalPrice,
+	taxa: taxaEntrega,
+        total: valorFinal,
         itens: itensPedido,
         dadosEntrega: {
           nome: nome,
@@ -309,7 +392,7 @@ const handleBuscaRua = async (query: string) => {
           cidade: dadosEntrega.cidade,
           estado: dadosEntrega.estado,
           complemento: dadosEntrega.complemento
-        },
+	},
         paymentData: paymentFormData
       })
 
@@ -321,6 +404,22 @@ const handleBuscaRua = async (query: string) => {
         window.location.href = "/";
         return;
       }
+
+if (error.response?.data?.idsRemover) {
+        alert(`❌ Ops! ${error.response.data.erro} Eles serão retirados do seu carrinho agora.`);
+        
+        const idsProblematicos = error.response.data.idsRemover;
+        
+        // Varre o carrinho tirando um por um (isso atualiza o LocalStorage sozinho!)
+        idsProblematicos.forEach((id: string) => {
+          removeItem(id); // Use o nome exato da função do seu useCart
+        });
+
+        // Opcional: Redireciona o cliente de volta pro cardápio pra ele escolher outra coisa
+        window.location.href = '/'; 
+        return;
+      }
+
       console.error('Erro ao processar pagamento:', error)
       alert('Erro ao processar o pedido. Verifique os dados e tente novamente.')
     } finally {
@@ -465,6 +564,7 @@ const handleBuscaRua = async (query: string) => {
                 type="text"
                 placeholder="000.000.000-00"
                 value={dadosEntrega.cpf}
+	        required
                 onChange={(e) => setDadosEntrega({ ...dadosEntrega, cpf: formatarCPF(e.target.value) })}
                 maxLength={14}
                 className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all"
@@ -504,6 +604,7 @@ const handleBuscaRua = async (query: string) => {
                     placeholder="00000-000"
                     className="flex-1 h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all"
                     value={cepInput}
+		    required
                     onChange={(e) => {
                       const cep = e.target.value.replace(/\D/g, '')
                       const cepFormatado = cep.slice(0, 8)
@@ -571,7 +672,7 @@ const handleBuscaRua = async (query: string) => {
                     value={dadosEntrega.numero}
                     onChange={(e) => setDadosEntrega({ ...dadosEntrega, numero: e.target.value })}
                     className="w-full h-12 px-4 rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary outline-none transition-all"
-                    placeholder="123"
+                    placeholder="123, S/N, Km 12"
                   />
                 </div>
                 <div>
@@ -603,9 +704,16 @@ const handleBuscaRua = async (query: string) => {
 
             {/* Botão */}
             <div className="pt-4">
+
+	     <div className="mb-4 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
+                <span className="font-small text-foreground">TeleEntrega:</span>
+                <span className="text-2xl font-bold text-primary">{formatCurrency(taxaEntrega)}</span>
+              </div>
+
+
               <div className="mb-4 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
                 <span className="font-medium text-foreground">Total a pagar:</span>
-                <span className="text-2xl font-bold text-primary">{formatCurrency(totalPrice)}</span>
+                <span className="text-2xl font-bold text-primary">{formatCurrency(valorFinal)}</span>
               </div>
 
               <button
@@ -621,16 +729,23 @@ const handleBuscaRua = async (query: string) => {
         {/* ETAPA 2: PAGAMENTO */}
         {step === 2 && mpReady && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+
+	  <div className="mb-6 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
+            <span className="font-small text-foreground">TeleEntrega:</span>
+            <span className="text-2xl font-bold text-primary">{formatCurrency(taxaEntrega)}</span>
+          </div>
+
+
           <div className="mb-6 p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
             <span className="font-medium text-foreground">Total a pagar:</span>
-            <span className="text-2xl font-bold text-primary">{formatCurrency(totalPrice)}</span>
+            <span className="text-2xl font-bold text-primary">{formatCurrency(valorFinal)}</span>
           </div>
           
           {mpReady ? (
             <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
               <Payment
-                key={totalPrice}
-                initialization={{ amount: Number(totalPrice) }}
+                key={valorFinal}
+                initialization={{ amount: Number(valorFinal) }}
                 customization={{
                   paymentMethods: {
                     creditCard: "all",

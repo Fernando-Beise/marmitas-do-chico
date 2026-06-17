@@ -14,13 +14,14 @@ export default function AdminDashboardPage() {
   const [lojaAberta, setLojaAberta] = useState(false)
   const [mensagemLoja, setMensagemLoja] = useState('')
   const [isLoadingLoja, setIsLoadingLoja] = useState(true)
+  const [pausaAutomatica, setPausaAutomatica] = useState(false);
 
   // Busca o status atual quando o Admin entra no painel
   useEffect(() => {
-    const fetchStatusLoja = async () => {
+   const fetchStatusLoja = async () => {
       try {
         const res = await api.get('/loja/status')
-        setLojaAberta(res.data.aberta)
+        setLojaAberta(res.data.statusNoBanco)
         setMensagemLoja(res.data.mensagem)
       } catch (error) {
         console.error("Erro ao carregar status da loja:", error)
@@ -29,6 +30,29 @@ export default function AdminDashboardPage() {
       }
     }
     fetchStatusLoja()
+
+
+   const verificarPausaDoAlmoco = () => {
+      const agora = new Date();
+      const tempoEmMinutos = (agora.getHours() * 60) + agora.getMinutes();
+
+      const inicioFechamento = Number(process.env.NEXT_HORARIO_PAUSA_INICIO) || 690;
+      const fimFechamento = Number(process.env.NEXT_HORARIO_PAUSA_FIM) || 810;
+
+      if (tempoEmMinutos >= inicioFechamento && tempoEmMinutos < fimFechamento) {
+        setPausaAutomatica(true);
+      } else {
+        setPausaAutomatica(false);
+      }
+    };
+
+    // Roda a verificação assim que ele abre o painel
+    verificarPausaDoAlmoco();
+
+    // Deixa um reloginho rodando a cada 1 minuto (60000ms)
+    // Assim, se ele deixar o notebook aberto, o aviso aparece/some sozinho na hora exata!
+    const intervalo = setInterval(verificarPausaDoAlmoco, 60000);
+    return () => clearInterval(intervalo);
   }, [])
 
   // Função que roda quando o Chico clica no Slider
@@ -57,17 +81,34 @@ export default function AdminDashboardPage() {
     async function loadData() {
       try {
         const { data } = await api.get('/pedidos')
-        setOrders(data)
+	const hoje = new Date();
+
+	const pedidosValidosHoje = data.filter((o: any) => {
+	   if (o.status?.tuUpperCase() === 'CANCELADO') return false;
+
+	   if (o.atualizadoEm){
+		const dataPedido = new Date(o.atualizadoEm);
+
+		return (
+		    dataPedido.getDate() === hoje.getDate() &&
+		    dataPedido.getMonth() === hoje.getMonth() &&
+	            dataPedido.getFullYear() === hoje.getFullYear()
+		);
+	   }
+	   return true;
+	});
+        setOrders(pedidosValidosHoje);
 
         // Lógica de processamento dos dados reais do banco
-        const pendentes = data.filter((o: any) => o.status === 'PENDENTE').length
-        const total = data.reduce((acc: number, curr: any) => acc + Number(curr.total), 0)
+        const pendentes = pedidosValidosHoje.filter((o: any) => o.status?.toUpperCase() === 'PENDENTE').length;
+        const entregues = pedidosValidosHoje.filter((o: any) => o.status?.toUpperCase() === 'ENTREGUE').length;
+        const total = pedidosValidosHoje.reduce((acc: number, curr: any) => acc + Number(curr.total), 0);
         
         setStats({
-          totalOrdersToday: data.length,
+          totalOrdersToday: pedidosValidosHoje.length,
           revenueToday: total,
           pendingOrders: pendentes,
-          deliveredMeals: data.filter((o: any) => o.status === 'ENTREGUE').length
+          deliveredMeals: entregues
         })
       } catch (err) {
         console.error("Erro ao carregar dados do dashboard:", err)
@@ -82,21 +123,47 @@ export default function AdminDashboardPage() {
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">Visão geral do seu negócio hoje</p>
       </div>
-      <Card className={`border-2 ${lojaAberta ? 'border-green-500 bg-green-50/50' : 'border-red-500 bg-red-50/50'}`}>
-        <CardContent className="flex items-center justify-between p-6">
+
+      {/* NOVO: O Banner Laranja que só aparece se o botão estiver ligado E for hora do rush */}
+      {lojaAberta && pausaAutomatica && (
+        <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-4 rounded-md shadow-sm">
+           <div className="flex items-center">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p className="font-bold">Pausa Automática Ativa (Horário de Pico)</p>
+           </div>
+           <p className="mt-1 text-sm">
+              O seu botão principal está <strong>LIGADO</strong>, mas o site está bloqueando novos pedidos temporariamente devido ao horário de pico (11:30 às 13:30). Às 13:30, o site voltará a aceitar pedidos automaticamente.
+           </p>
+        </div>
+      )}
+
+      <Card className={`border-2 ${!lojaAberta ? 'border-red-500 bg-red-50/50' : pausaAutomatica ? 'border-orange-500 bg-orange-50/50' : 'border-green-500 bg-green-50/50'}`}>
+        
+	<CardContent className="flex items-center justify-between p-6">
+
           <div className="space-y-1">
+
             <h3 className="font-bold text-lg">
-              Status da Loja: {lojaAberta ? 'ABERTA PARA PEDIDOS' : 'FECHADA (COZINHANDO/ENTREGANDO)'}
+              Status da Loja: {!lojaAberta ? 'FECHADA (COZINHANDO/ENTREGANDO)' : pausaAutomatica ? 'PAUSADA PARA O ALMOÇO' : 'ABERTA PARA PEDIDOS'}
             </h3>
-            {lojaAberta ? (
+
+            {!lojaAberta ? (
+              <p className="text-sm text-red-700">
+                Os clientes não conseguem fazer pedidos no momento.
+              </p>
+            ) : pausaAutomatica ? (
+	      <p className="text-sm text-orange-700 font-medium">
+                 A loja será aberta às 13:30
+              </p>
+
+	    ) : (
               <p className="text-sm text-green-700 font-medium">
                 {mensagemLoja}
               </p>
-            ) : (
-              <p className="text-sm text-red-600">
-                Os clientes não conseguem fazer pedidos no momento.
-              </p>
             )}
+
           </div>
           
           <div className="flex items-center gap-2">
@@ -106,6 +173,7 @@ export default function AdminDashboardPage() {
               disabled={isLoadingLoja}
             />
           </div>
+
         </CardContent>
       </Card>
 
@@ -144,24 +212,31 @@ export default function AdminDashboardPage() {
               <Link href="/admin/pedidos">Ver todos</Link>
             </Button>
           </CardHeader>
+
           <CardContent>
             <div className="space-y-4">
+
               {orders.slice(0, 5).map((order) => (
                 <div key={order.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+
                   <div>
                     <p className="font-medium">{order.id}</p>
                     <Badge variant="secondary">{order.status}</Badge>
                   </div>
+
                   <div className="flex items-center gap-3">
                     <span className="font-semibold">R$ {Number(order.total).toFixed(2)}</span>
                     <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/admin/pedidos/${order.id}`}><Eye className="h-4 w-4" /></Link>
+                      <Link href={'/admin/pedidos/'+order.id}><Eye className="h-4 w-4" /></Link>
                     </Button>
                   </div>
+
                 </div>
               ))}
+
             </div>
           </CardContent>
+
         </Card>
       </div>
     </div>
