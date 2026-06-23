@@ -107,7 +107,7 @@ O contêiner do banco de dados executa automaticamente o arquivo de sementes (se
 E-mail/Login: [vendedor@gmail.com] (Substitua aqui pelo e-mail real do seu arquivo seed, ex: admin@marmitasdochico.com)
 Senha: [senha123] (Substitua aqui pela senha real definida no seu arquivo seed)
 
-6. Encerrando os Serviços
+### 6. Encerrando os Serviços
 
 Para parar a execução da aplicação de forma segura sem perder os dados salvos ou as configurações de autenticação do WhatsApp (armazenados em volumes locais isolados):
 
