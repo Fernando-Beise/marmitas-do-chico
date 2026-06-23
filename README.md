@@ -4,6 +4,9 @@
 
 O **Marmitas do Chico** é uma plataforma *full-stack* desenvolvida para digitalizar e automatizar os processos de um negócio real de venda de marmitas caseiras. O objetivo principal é substituir processos manuais de anotação de pedidos e controle financeiro por um sistema centralizado, inteligente e de fácil uso, tanto para o cliente final quanto para o proprietário.
 
+Para propósitos de demonstração o site está hospedado na url:
+https://chicopratosespeciais.com
+
 ---
 
 ## Principais Funcionalidades
