@@ -63,7 +63,6 @@ Antes de começar, certifique-se de ter instalado:
 
 ### 2. Clonando o repositório
 
-```bash
 git clone [https://github.com/Fernando-Beise/marmitas-do-chico.git](https://github.com/Fernando-Beise/marmitas-do-chico.git)
 cd marmitas-do-chico
 
@@ -105,7 +104,7 @@ Credenciais de Acesso (Painel Administrativo)
 
 O contêiner do banco de dados executa automaticamente o arquivo de sementes (seed.ts) na primeira inicialização. Para acessar o painel de gerenciamento de marmitas, relatórios de vendas e disparos do WhatsApp, utilize o usuário administrador padrão criado pelo sistema:
 
-E-mail/Login: [banca@ufsm.br] (Substitua aqui pelo e-mail real do seu arquivo seed, ex: admin@marmitasdochico.com)
+E-mail/Login: [vendedor@gmail.com] (Substitua aqui pelo e-mail real do seu arquivo seed, ex: admin@marmitasdochico.com)
 Senha: [senha123] (Substitua aqui pela senha real definida no seu arquivo seed)
 
 6. Encerrando os Serviços
