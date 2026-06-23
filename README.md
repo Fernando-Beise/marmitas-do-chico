@@ -50,27 +50,31 @@ Este projeto utiliza uma arquitetura moderna baseada em JavaScript/TypeScript (M
 
 ---
 
-## Como rodar o projeto localmente
+## Como rodar o projeto localmente (Docker & Docker Compose)
 
-Siga os passos abaixo para testar o sistema na sua máquina:
+Para facilitar a avaliação da banca e garantir que o ambiente execute exatamente da mesma forma em qualquer máquina sem a necessidade de instalar dependências globais, o sistema foi totalmente containerizado.
+
+Siga os passos abaixo para subir a aplicação completa na sua máquina:
 
 ### 1. Pré-requisitos
-Certifique-se de ter instalado:
-* **Node.js** (versão 20+ recomendada)
+Antes de começar, certifique-se de ter instalado:
 * **Git**
-* Uma conta no [Neon](https://neon.tech/) (ou banco PostgreSQL local) e no [Mercado Pago](https://www.mercadopago.com.br/developers) para obter as chaves de teste.
+* **Docker Desktop** (ou Docker Engine + Docker Compose)
 
 ### 2. Clonando o repositório
 
-git clone [https://github.com/Fernando-Beise/marmitas-do-chico.git](https://github.com/SEU-USUARIO/marmitas-do-chico.git)
+```bash
+git clone [https://github.com/Fernando-Beise/marmitas-do-chico.git](https://github.com/Fernando-Beise/marmitas-do-chico.git)
+cd marmitas-do-chico
+
+### 2. Clonando o repositório
+
+git clone [https://github.com/Fernando-Beise/marmitas-do-chico.git](https://github.com/Fernando-Beise/marmitas-do-chico.git)
 cd marmitas-do-chico
 
 ### 3. Configurando as Variáveis de Ambiente
 
-Crie um arquivo .env na raiz dos projetos (ou nas respectivas pastas de web e api) seguindo o modelo abaixo:
-
-# Banco de Dados (Prisma)
-DATABASE_URL="postgresql://usuario:senha@seu-host.neon.tech/nome-do-banco?sslmode=require"
+Na raiz do projeto (onde está localizado o arquivo docker-compose.yml), crie um arquivo chamado .env. O Docker Compose utilizará essas variáveis para expor as portas de segurança e injetar as chaves necessárias:
 
 # Segurança da API
 JWT_SECRET="sua_chave_secreta_super_segura"
@@ -79,22 +83,36 @@ JWT_SECRET="sua_chave_secreta_super_segura"
 NEXT_PUBLIC_MP_PUBLIC_KEY="TEST-sua-public-key"
 MP_ACCESS_TOKEN="TEST-seu-access-token"
 
-### 4. Instalando dependências e Banco de Dados
+### 4. Inicializando a Orquestração (Deploy Local)
 
-# Instale as dependências na pasta raiz (ou nas pastas do monorepo)
-npm install
+Com o terminal aberto na raiz do projeto, execute o comando abaixo para baixar as imagens oficiais, construir as imagens da aplicação (Front-end e Back-end), rodar as migrações do banco de dados e injetar o seed inicial:
 
-# Execute as migrações do banco de dados
-npx prisma migrate dev
+docker-compose up -d --build
 
-### 5. Iniciando os servidores
-Bash
+Para acompanhar a inicialização dos servidores, geração do QR Code de conexão do WhatsApp Business (Baileys) ou logs de depuração:
 
-# Inicie o back-end (API)
-npm run dev
+docker logs marmitas_api -f
 
-# Em outro terminal, inicie o front-end (Web)
-npm run dev
+### 5. Acessando o Sistema
+
+Assim que os contêineres estiverem de pé (Status: Up), o sistema estará acessível através dos seguintes endereços locais:
+
+Frente de Loja (Cliente): http://localhost:3000
+Painel Administrativo (Dono/Admin): http://localhost:3000/login
+Healthcheck da API (Back-end): http://localhost:3001/health
+
+Credenciais de Acesso (Painel Administrativo)
+
+O contêiner do banco de dados executa automaticamente o arquivo de sementes (seed.ts) na primeira inicialização. Para acessar o painel de gerenciamento de marmitas, relatórios de vendas e disparos do WhatsApp, utilize o usuário administrador padrão criado pelo sistema:
+
+E-mail/Login: [banca@ufsm.br] (Substitua aqui pelo e-mail real do seu arquivo seed, ex: admin@marmitasdochico.com)
+Senha: [senha123] (Substitua aqui pela senha real definida no seu arquivo seed)
+
+6. Encerrando os Serviços
+
+Para parar a execução da aplicação de forma segura sem perder os dados salvos ou as configurações de autenticação do WhatsApp (armazenados em volumes locais isolados):
+
+docker-compose down
 
 Desenvolvedor:
 Projeto idealizado e desenvolvido por Fernando Beise para a disciplina de Projeto Integrador.
