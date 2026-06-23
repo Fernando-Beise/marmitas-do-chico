@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. Banco de Dados Local para Testes
+  postgres:
+    image: postgres:15-alpine
+    container_name: marmitas_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: marmitas
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # 2. Back-end (API)
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: marmitas_api
+    ports:
+      - "3001:3001"
+    environment:
+      # Conecta ao banco de dados que está no contêiner acima
+      - DATABASE_URL=postgresql://admin:adminpassword@postgres:5432/marmitas?schema=public
+      - DIRECT_URL=postgresql://admin:adminpassword@postgres:5432/marmitas?schema=public
+      - JWT_SECRET=chave_secreta_banca_ufsm_2026
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN} # Puxa do .env do professor
+    volumes:
+      - baileys_auth:/app/auth_info_baileys # Salva a sessão do WhatsApp
+    depends_on:
+      - postgres
+    # Injeta as tabelas no banco de dados vazio e depois inicia o servidor
+    command: sh -c "npx prisma db push && npx tsx src/db/seed.ts && npm start"
+
+  # 3. Front-end (Web)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: marmitas_web
+    ports:
+      - "3000:3000"
+    environment:
+      # Diz ao site para procurar a API no localhost
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  baileys_auth:
